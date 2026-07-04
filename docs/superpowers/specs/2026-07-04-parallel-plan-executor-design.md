@@ -200,7 +200,7 @@ tiempo de reloj.
 
 | Caso | Manejo |
 |---|---|
-| Dependencia no detectada por el parser (falso negativo) | La tarea falla por símbolo inexistente/error de import → se trata como *posible bloqueo por dependencia faltante*, se reintenta una vez más tarde (cuando más del DAG haya cerrado). Si vuelve a fallar igual, se marca bloqueada. |
+| Dependencia no detectada por el parser (falso negativo) | La tarea arranca sin su dependencia real y falla ruidosamente (o se auto-reporta `BLOCKED`); sus dependientes transitivos se marcan `skipped`, sin intentarse. Todo esto queda asentado en el reporte final — no hay reintento automático en v1 (ver sección 7). |
 | Fallo real de verificación (bug, no dependencia) | El revisor adversarial lo detecta → un reintento con su feedback → si sigue fallando, se marca **bloqueada**, no se mergea, pero las ramas independientes del DAG siguen su curso. |
 | Tarea bloqueada con dependientes | Todo lo que dependía de ella se marca `skipped — blocked by Task N`, sin intentarse. |
 | Conflicto real de merge (no el de manifiesto, ya evitado con worktrees) | Se detiene esa rama del DAG, se reporta, no se auto-resuelve. |
@@ -225,6 +225,12 @@ tiempo de reloj.
   mitad de ejecución de forma nativa; se optó por verificación adversarial automática
   por tarea + un solo review humano al final, en vez de introducir checkpoints
   artificiales que reducirían la ganancia de velocidad.
+- **Reintento automático de una dependencia no detectada** (esperar a que más del DAG
+  haya cerrado y reintentar la tarea afectada antes de marcarla bloqueada): en v1 la
+  tarea simplemente falla ruidosamente (o reporta `BLOCKED`) y sus dependientes se
+  saltan, sin reintento — más simple y suficientemente seguro mientras el mecanismo real
+  de reintento no esté implementado. Se puede agregar después si en la práctica los
+  falsos negativos del parser resultan comunes.
 
 ## 8. Testing (del propio workflow, antes de confiar en él)
 

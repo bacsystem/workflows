@@ -43,8 +43,11 @@ node bin/parse-plan.js /path/to/your-plan.md > /tmp/plan-graph.json
 ## Known limitations (v1)
 
 - The `Consumes`/`Produces` parser reads one line at a time — a value that wraps onto a
-  second line in the plan's prose won't be captured. A missed dependency fails safe: the
-  scheduler's "possibly blocked, retry" path (see design spec §6) catches most cases, but
-  isn't a substitute for keeping `Consumes`/`Produces` on one line per entry.
+  second line in the plan's prose won't be captured. A missed dependency does **not**
+  silently misorder tasks: the task starts without its real dependency in place, so it
+  either fails loudly (or self-reports `BLOCKED`) and its transitive dependents are
+  skipped, all surfaced in the final report. A retry-later mechanism (re-attempt once more
+  of the DAG has closed) was evaluated and deferred — see design spec §7 — so today the
+  only mitigation is keeping `Consumes`/`Produces` on one line per entry.
 - No speculative re-execution of an abnormally slow task (evaluated and deferred, see
   design spec §7) — right-sizing tasks in the plan itself is the current mitigation.

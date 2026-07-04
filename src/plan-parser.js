@@ -37,11 +37,13 @@ function parseFiles(body) {
   return files;
 }
 
-// Heuristic: pulls bare identifiers (dotted names, optional call parens) out of the
-// Consumes/Produces prose. Known limitation: a value that wraps onto a second line is
-// not captured (Consumes/Produces are matched line-by-line, see below) — a missed
-// dependency here fails safe via the scheduler's "possibly blocked, retry" path
-// (design spec §6), not a silent incorrect ordering.
+// Heuristic: pulls bare identifiers (dotted names) out of the Consumes/Produces prose;
+// parenthesized call-argument lists are already stripped by extractSymbols before this
+// regex runs (see below), so it never has parens to match. Known limitation: a value
+// that wraps onto a second line is not captured (Consumes/Produces are matched
+// line-by-line, see below) — a missed dependency here does not silently misorder tasks:
+// the affected task fails loudly (or reports BLOCKED) and its transitive dependents are
+// skipped, all surfaced in the final report.
 const IDENTIFIER_RE = /`?([A-Za-z_][A-Za-z0-9_.]*)\(?/g;
 
 function extractSymbols(line) {
