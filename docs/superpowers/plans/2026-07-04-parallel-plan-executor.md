@@ -786,9 +786,26 @@ const IMPLEMENTER_SCHEMA = {
     testSummary: { type: 'string' },
     reportFile: { type: 'string' },
     concerns: { type: 'string' },
+    startedAt: { type: 'string', description: 'HH:MM:SS wall-clock time when work began (from `date +%H:%M:%S`)' },
+    finishedAt: { type: 'string', description: 'HH:MM:SS wall-clock time right before reporting' },
   },
-  required: ['status', 'branch', 'baseSha', 'headSha', 'reportFile'],
+  required: ['status', 'branch', 'baseSha', 'headSha', 'reportFile', 'startedAt', 'finishedAt'],
 };
+
+// The Workflow sandbox forbids Date.now()/new Date() (resume determinism), so wall-clock
+// times come from the agents themselves (they run `date`); the script only does string
+// arithmetic on HH:MM:SS values it was handed.
+function hhmmssToSeconds(t) {
+  const [h, m, s] = t.split(':').map(Number);
+  return h * 3600 + m * 60 + s;
+}
+
+function formatDuration(startedAt, finishedAt) {
+  if (!startedAt || !finishedAt) return 'duration unknown';
+  let secs = hhmmssToSeconds(finishedAt) - hhmmssToSeconds(startedAt);
+  if (secs < 0) secs += 24 * 3600; // crossed midnight
+  return `${Math.floor(secs / 60)}m${String(secs % 60).padStart(2, '0')}s`;
+}
 
 const REVIEWER_SCHEMA = {
   type: 'object',
@@ -815,6 +832,15 @@ function enqueueMerge(fn) {
   return next;
 }
 
+// Textual progress bar, emitted via log() after every task settles so the user
+// sees advancement in the narrator lines without opening /workflows.
+let settledCount = 0;
+function progressBar() {
+  const total = tasks.length;
+  const filled = Math.round((settledCount / total) * 20);
+  return `[${'#'.repeat(filled)}${'-'.repeat(20 - filled)}] ${settledCount}/${total} tasks settled`;
+}
+
 async function implement(task) {
   return agent(
     `You are implementing Task ${task.id}: "${task.title}", from the plan at ${planPath}, ` +
@@ -822,6 +848,8 @@ async function implement(task) {
     `${FIND_SDD_SCRIPTS} Run: task-brief ${planPath} ${task.id} — it prints your brief ` +
     `file path. Read ONLY that brief file for your requirements, not the whole plan.\n\n` +
     `Read the "## Global Constraints" section from ${planPath} yourself — it binds this task.\n\n` +
+    `Your very first action: run \`date +%H:%M:%S\` and report that value as startedAt; run ` +
+    `it again right before reporting and use it as finishedAt.\n\n` +
     `Before starting: create and switch to branch task-${task.id} (a fixed, predictable ` +
     `name so a later fix round can find it), then record its parent commit SHA as baseSha.\n\n` +
     `Follow superpowers:test-driven-development for every code change. Implement exactly ` +
@@ -858,6 +886,7 @@ async function fix(task, impl, findings) {
   return agent(
     `On branch task-${task.id} in repo ${repoPath} (do not create a new worktree — check out ` +
     `that existing branch), fix these review findings for Task ${task.id}: ${findings}\n\n` +
+    `Run \`date +%H:%M:%S\` first (startedAt) and again before reporting (finishedAt).\n\n` +
     `Re-run the tests covering your change and append the results to ` +
     `${impl.reportFile}. Report back the new HEAD SHA as headSha (baseSha and branch stay ` +
     `the same).`,
@@ -867,10 +896,19 @@ async function fix(task, impl, findings) {
 
 async function runTask(taskId) {
   const task = tasksById.get(taskId);
-  let impl = await implement(task);
+  let impl;
+  try {
+    impl = await implement(task);
+  } catch (error) {
+    settledCount += 1;
+    log(`${progressBar()} — Task ${taskId} FAILED`);
+    throw error;
+  }
 
   if (impl.status === 'BLOCKED' || impl.status === 'NEEDS_CONTEXT') {
     await appendLedger(`Task ${taskId}: ${impl.status} — ${impl.concerns ?? 'no detail given'}`);
+    settledCount += 1;
+    log(`${progressBar()} — Task ${taskId} ${impl.status}`);
     throw new Error(`Task ${taskId} ${impl.status}: ${impl.concerns ?? 'no detail given'}`);
   }
 
@@ -892,7 +930,13 @@ async function runTask(taskId) {
       { label: `merge-${taskId}`, phase: 'Merge' }
     )
   );
-  await appendLedger(`Task ${taskId}: complete (commits ${impl.baseSha.slice(0, 7)}..${impl.headSha.slice(0, 7)}, review clean)`);
+  await appendLedger(
+    `Task ${taskId}: complete ${impl.startedAt}..${impl.finishedAt} ` +
+    `(${formatDuration(impl.startedAt, impl.finishedAt)}, commits ` +
+    `${impl.baseSha.slice(0, 7)}..${impl.headSha.slice(0, 7)}, review clean)`
+  );
+  settledCount += 1;
+  log(`${progressBar()} — Task ${taskId} done in ${formatDuration(impl.startedAt, impl.finishedAt)}`);
   return impl;
 }
 
@@ -910,7 +954,10 @@ if (mergedCount > 0) {
 }
 
 const summaryLines = [...results.entries()].map(([id, r]) => {
-  if (r.status === 'done') return `Task ${id}: done`;
+  if (r.status === 'done') {
+    const impl = r.result;
+    return `Task ${id}: done in ${formatDuration(impl?.startedAt, impl?.finishedAt)} (${impl?.startedAt}..${impl?.finishedAt})`;
+  }
   if (r.status === 'failed') return `Task ${id}: FAILED — ${r.error?.message ?? 'unknown error'}`;
   return `Task ${id}: skipped — ${r.reason}`;
 });
