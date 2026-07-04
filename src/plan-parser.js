@@ -1,6 +1,7 @@
 const TASK_HEADER_RE = /^### Task (\d+): (.+)$/m;
 
 export function parsePlan(planText) {
+  planText = planText.replace(/\r\n/g, '\n');
   const parts = planText.split(TASK_HEADER_RE);
   const tasks = [];
   // parts = [preamble, id1, title1, body1, id2, title2, body2, ...]
