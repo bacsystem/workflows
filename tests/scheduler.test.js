@@ -53,3 +53,20 @@ test('independent branches keep running even if one branch fails', async () => {
   assert.equal(results.get(2).status, 'done');
   assert.equal(results.get(3).status, 'skipped');
 });
+
+test('cascades skip status transitively through a chain of dependents', async () => {
+  const graph = { 1: [], 2: [1], 3: [2] };
+  const called = [];
+
+  const results = await runDag(graph, async (id) => {
+    called.push(id);
+    if (id === 1) throw new Error('boom');
+    return id;
+  });
+
+  assert.equal(results.get(1).status, 'failed');
+  assert.equal(results.get(2).status, 'skipped');
+  assert.equal(results.get(3).status, 'skipped');
+  assert.ok(!called.includes(2));
+  assert.ok(!called.includes(3));
+});

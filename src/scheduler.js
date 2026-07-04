@@ -7,11 +7,15 @@ export async function runDag(graph, taskFn) {
 
     const promise = (async () => {
       const deps = graph[taskId] ?? [];
-      try {
-        await Promise.all(deps.map(run));
-      } catch {
-        results.set(taskId, { status: 'skipped', reason: 'blocked by a failed dependency' });
-        return;
+      const depOutcomes = await Promise.allSettled(deps.map(run));
+      const blockedIndex = depOutcomes.findIndex((outcome) => outcome.status === 'rejected');
+      if (blockedIndex !== -1) {
+        const blockedBy = deps[blockedIndex];
+        results.set(taskId, {
+          status: 'skipped',
+          reason: `blocked by a failed dependency (task ${blockedBy})`,
+        });
+        throw new Error(`task ${taskId} skipped: blocked by dependency ${blockedBy}`);
       }
 
       try {
