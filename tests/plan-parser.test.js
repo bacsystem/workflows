@@ -50,3 +50,17 @@ test('handles a real excerpt from the business-core plan without throwing', () =
   assert.ok(tasks.length >= 1);
   assert.ok(tasks[0].title.length > 0);
 });
+
+test('parses a plan with CRLF line endings identically to LF', () => {
+  // Normalize the on-disk fixture to LF first (git checkout settings such as
+  // core.autocrlf can already have converted it) before forcing it to CRLF,
+  // so this test faithfully represents a Windows CRLF checkout regardless of
+  // how the fixture itself was checked out.
+  const lfPlan = samplePlan.replace(/\r\n/g, '\n');
+  const crlfPlan = lfPlan.replace(/\n/g, '\r\n');
+  const lfTasks = parsePlan(lfPlan);
+  const crlfTasks = parsePlan(crlfPlan);
+
+  assert.equal(crlfTasks.length, 3);
+  assert.deepEqual(crlfTasks, lfTasks);
+});
