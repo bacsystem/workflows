@@ -236,3 +236,38 @@ Apuntar `integrationBranch` a una **feature branch efímera creada desde `develo
 (`feature/<plan>`), nunca a `develop`/`main` directamente: fracaso barato (se borra la
 rama), mainline protegida por construcción, y el handoff final a `git-flow` (un solo PR
 feature → develop revisado por el humano) queda donde debe estar. Documentado en README.
+
+---
+
+# Piloto 5 — pilot-blocked (mismo día, v0.4.2): el run de resiliencia
+
+Diseñado para ejercitar el único camino nunca recorrido en vivo: **BLOCKED y su
+cascada**. Cadena estricta `1 → 2 → 3` donde la task 1 es deliberadamente imposible:
+declara `Modify: src/legacy-adapter.js` sobre un archivo que no existe, y las Global
+Constraints prohíben inventar archivos declarados como Modify (el caso realista de un
+plan que referencia código inexistente — la "known limitation" del README, ahora
+observada de verdad).
+
+## Resultado: todo el camino de resiliencia validado
+
+- ✅ **El implementador reportó BLOCKED como corresponde**: detectó el archivo faltante,
+  lo verificó con `git ls-files` antes de afirmarlo, respetó la prohibición, y sus
+  `concerns` incluyeron instrucciones accionables para destrabar (commitear el adapter
+  real, o cambiar el plan a Create con el contrato esperado). No inventó el archivo.
+- ✅ **`assertNotBlocked` + ledger**: la línea BLOCKED quedó íntegra en `progress.md` —
+  con comillas, dos puntos y rutas adentro — gracias al framing `<line>` (fix ronda 2).
+- ✅ **Cascada quirúrgica**: tasks 2 y 3 nunca lanzaron un solo agente; skipped con
+  `root cause: task 1` correcto en ambos eslabones.
+- ✅ **Guard `mergedCount = 0`**: la review final se omitió — primera vez ejercitado.
+- ✅ **Cero fricción con el clasificador**: una tarea bloqueada nunca llega al merge,
+  así que el run completo pasó sin necesitar autorización alguna.
+- 📊 Costo total: **2 agentes, ~49k tokens, ~3 minutos** — la resiliencia bien diseñada
+  falla barato.
+- Nota menor: la rama `task-1` queda creada (el worktree se libera pero la rama
+  sobrevive al bloqueo) — residuo inocuo, se limpia con `git branch -D`.
+
+## Único camino aún no ejercitado en vivo
+
+La **ronda de fix** (review reprueba → fix agent → re-review): en 5 pilotos, ninguna
+review reprobó a la primera. Queda como pendiente conocido; el camino está cubierto por
+los tests del build y su lógica es la misma cadena implement→review ya validada.
