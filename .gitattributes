@@ -1,0 +1,4 @@
+# El artefacto del workflow (y su template) deben quedar SIEMPRE con LF en el working
+# copy: el diálogo de permisos de la tool Workflow rechaza scripts con \r ("control
+# characters") — piloto 2026-07-15, hallazgo F1.
+workflows/*.js text eol=lf

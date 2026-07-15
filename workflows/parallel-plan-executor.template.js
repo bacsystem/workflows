@@ -130,25 +130,39 @@ async function assertNotBlocked(taskId, impl) {
 }
 
 async function implement(task) {
+  // Piloto 2026-07-15, hallazgo F3: isolation:'worktree' del harness aísla el repo de la
+  // SESIÓN, no repoPath — dos implementadores paralelos compartieron el working tree del
+  // repo objetivo y sus ramas se pisaron. El aislamiento correcto es un worktree DEL
+  // REPO OBJETIVO, creado y liberado por el propio agente.
+  const worktreeDir = `${repoPath}/.worktrees/task-${task.id}`;
   return agent(
     `You are implementing Task ${task.id}: "${task.title}", from the plan at ${planPath}, ` +
     `in repo ${repoPath}.\n\n` +
+    `Other tasks run in parallel against that same repository — NEVER switch branches or ` +
+    `edit files in ${repoPath} itself. Your very first repo action: create your own ` +
+    `isolated worktree by running \`git -C ${repoPath} worktree add ${worktreeDir} ` +
+    `-b task-${task.id}\` (fixed, predictable branch name so a later fix round can find ` +
+    `it), then do ALL your work — edits, tests, commits — inside ${worktreeDir}. Record ` +
+    `that worktree's initial HEAD SHA as baseSha.\n\n` +
     `${FIND_SDD_SCRIPTS} Run: task-brief ${planPath} ${task.id} — it prints your brief ` +
-    `file path. Read ONLY that brief file for your requirements, not the whole plan.\n\n` +
+    `file path. Read ONLY that brief file for your requirements, not the whole plan. If ` +
+    `that brief file is not already under ${repoPath}/.superpowers/sdd/, copy it to ` +
+    `${repoPath}/.superpowers/sdd/task-${task.id}-brief.md — the reviewer reads it from there.\n\n` +
     `Read the "## Global Constraints" section from ${planPath} yourself — it binds this task.\n\n` +
-    `Your very first action: run \`date +%H:%M:%S\` and report that value as startedAt; run ` +
-    `it again right before reporting and use it as finishedAt.\n\n` +
-    `Before starting: create and switch to branch task-${task.id} (a fixed, predictable ` +
-    `name so a later fix round can find it), then record its parent commit SHA as baseSha.\n\n` +
+    `Your very first action overall: run \`date +%H:%M:%S\` and report that value as ` +
+    `startedAt; run it again right before reporting and use it as finishedAt.\n\n` +
     `Follow superpowers:test-driven-development for every code change. Implement exactly ` +
     `what the brief specifies, write tests, verify RED then GREEN, commit, then self-review ` +
     `(completeness, quality, YAGNI discipline, test hygiene) before reporting.\n\n` +
     `Write your full report (what you built, TDD evidence, files changed, self-review ` +
-    `findings) to .superpowers/sdd/task-${task.id}-report.md in repo ${repoPath}, then ` +
-    `record HEAD's SHA as headSha and report back via the required fields. Use BLOCKED or ` +
-    `NEEDS_CONTEXT if you cannot proceed — there is no one to ask mid-run, so describe ` +
-    `exactly what's missing in "concerns"; it will be resolved after this run, not now.`,
-    { label: `implement-${task.id}`, phase: 'Implement', isolation: 'worktree', schema: IMPLEMENTER_SCHEMA }
+    `findings) to .superpowers/sdd/task-${task.id}-report.md in repo ${repoPath} (the main ` +
+    `repo, not your worktree), record HEAD's SHA as headSha, then release your worktree: ` +
+    `run \`git -C ${repoPath} worktree remove --force ${worktreeDir}\` — your branch and ` +
+    `commits remain, and this frees task-${task.id} for a potential fix round. Report back ` +
+    `via the required fields. Use BLOCKED or NEEDS_CONTEXT if you cannot proceed — there ` +
+    `is no one to ask mid-run, so describe exactly what's missing in "concerns"; it will ` +
+    `be resolved after this run, not now.`,
+    { label: `implement-${task.id}`, phase: 'Implement', schema: IMPLEMENTER_SCHEMA }
   );
 }
 
@@ -199,6 +213,9 @@ async function runTask(taskId) {
 
 async function executeTask(taskId) {
   const task = tasksById.get(taskId);
+  // Señal de vida al arrancar (piloto, hallazgo F5): la barra solo se emite al settle,
+  // así que sin esto el primer implement largo transcurre en silencio total.
+  log(`Task ${taskId}: started (implement)`);
   let impl = ensureAgentResult(taskId, await implement(task), 'implementer');
   await assertNotBlocked(taskId, impl);
 
