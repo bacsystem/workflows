@@ -43,6 +43,29 @@ node bin/parse-plan.js /path/to/your-plan.md > /tmp/plan-graph.json
 #            integrationBranch: "develop" }  # the branch every task merges into (required)
 ```
 
+## Recommended branching topology (validated in pilot 4)
+
+Point `integrationBranch` at an **ephemeral feature branch cut from `develop`** — never
+at `develop`/`main` directly:
+
+```
+master (release)                 ← never touched by agents
+  └── develop (integration)     ← never touched by agents
+        └── feature/<plan>      ← integrationBranch: task branches merge here ★
+              ├── task-1        ← one isolated worktree per implementer
+              └── task-N
+```
+
+Why: mainline stays protected by construction (agent-written code never lands on a
+shared branch without human review), a failed run costs one `git branch -D`, and the
+human gate sits exactly where it belongs — the single `feature/<plan> → develop` PR you
+open via `git-flow` after reviewing the finished branch.
+
+**Permissions note**: if you run under Claude Code's auto mode, the permission
+classifier requires human authorization for the workflow's merge agents regardless of
+the target branch. Either add an allow rule via `/permissions` before the run, or expect
+to authorize merges explicitly (naming branches and target) when prompted.
+
 ## Safety checks (v0.2)
 
 - **Startup validation**: the workflow validates `args` before launching any agent —
