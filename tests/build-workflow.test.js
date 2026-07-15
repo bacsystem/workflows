@@ -40,3 +40,12 @@ test('built workflow serializes fix agents through a dedicated queue', () => {
   assert.ok(output.includes('function enqueueFix('));
   assert.ok(output.includes('enqueueFix(() => fix(task, impl'), 'runTask must route fix() through the queue');
 });
+
+test('built workflow settles every terminal branch and reconciles the progress bar', () => {
+  execFileSync('node', [path.join(root, 'scripts', 'build-workflow.js')]);
+  const output = readFileSync(path.join(root, 'workflows', 'parallel-plan-executor.js'), 'utf8');
+
+  assert.ok(output.includes('function settle('), 'progress accounting must be centralized in a settle() helper');
+  assert.ok(output.includes("settle(taskId, 'FAILED (review)')"), 'the review-failed-after-fix branch must count as settled');
+  assert.ok(output.includes('settledCount = results.size'), 'skipped tasks must be reconciled after runDag');
+});
