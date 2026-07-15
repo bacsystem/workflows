@@ -23,3 +23,26 @@ test('quita imports y exports igual con finales CRLF', () => {
 test('normaliza CRLF a LF en el resultado', () => {
   assert.ok(!inlineSource(CRLF_MODULE).includes('\r'));
 });
+
+test('quita un import multilínea completo, no solo su primera línea', () => {
+  const module = [
+    'import {',
+    '  alpha,',
+    '  beta,',
+    "} from './x.js';",
+    '',
+    'export function f() {',
+    '  return alpha + beta;',
+    '}',
+    '',
+  ].join('\n');
+  const inlined = inlineSource(module);
+  assert.ok(!inlined.includes('import'), 'no debe quedar rastro del import');
+  assert.ok(!inlined.includes('alpha,'), 'los especificadores del import deben irse con él');
+  assert.ok(inlined.includes('function f()'));
+  assert.ok(inlined.includes('return alpha + beta;'), 'el cuerpo del módulo debe quedar intacto');
+});
+
+test('falla ruidosamente ante un export default, que dejaría sintaxis inválida', () => {
+  assert.throws(() => inlineSource('export default function f() {}\n'), /export default/);
+});

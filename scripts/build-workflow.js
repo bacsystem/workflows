@@ -26,12 +26,15 @@ let output = readFileSync(templatePath, 'utf8').replace(/\r\n/g, '\n');
 const placeholders = {
   '/* __SCHEDULER_SOURCE__ */': schedulerSource,
   '/* __VALIDATION_SOURCE__ */': validationSource,
+  '/* __TIME_SOURCE__ */': inlineModule('src', 'time.js'),
 };
 for (const [placeholder, source] of Object.entries(placeholders)) {
   if (!output.includes(placeholder)) {
     throw new Error(`Template is missing the ${placeholder} placeholder`);
   }
-  output = output.replace(placeholder, source);
+  // Reemplazo con función: un string como segundo argumento interpretaría patrones
+  // especiales ($&, $', $$...) dentro del código inyectado.
+  output = output.replace(placeholder, () => source);
 }
 
 const outputPath = path.join(root, 'workflows', 'parallel-plan-executor.js');

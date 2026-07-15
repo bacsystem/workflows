@@ -13,6 +13,8 @@ export const meta = {
 
 /* __VALIDATION_SOURCE__ */
 
+/* __TIME_SOURCE__ */
+
 const { graph, tasks, planPath, repoPath } = args;
 validateWorkflowArgs({ tasks, graph }); // falla rápido y claro, nunca deadlock
 const tasksById = new Map(tasks.map((t) => [t.id, t]));
@@ -38,21 +40,6 @@ const IMPLEMENTER_SCHEMA = {
   },
   required: ['status', 'branch', 'baseSha', 'headSha', 'reportFile', 'startedAt', 'finishedAt'],
 };
-
-// The Workflow sandbox forbids Date.now()/new Date() (resume determinism), so wall-clock
-// times come from the agents themselves (they run `date`); the script only does string
-// arithmetic on HH:MM:SS values it was handed.
-function hhmmssToSeconds(t) {
-  const [h, m, s] = t.split(':').map(Number);
-  return h * 3600 + m * 60 + s;
-}
-
-function formatDuration(startedAt, finishedAt) {
-  if (!startedAt || !finishedAt) return 'duration unknown';
-  let secs = hhmmssToSeconds(finishedAt) - hhmmssToSeconds(startedAt);
-  if (secs < 0) secs += 24 * 3600; // crossed midnight
-  return `${Math.floor(secs / 60)}m${String(secs % 60).padStart(2, '0')}s`;
-}
 
 const REVIEWER_SCHEMA = {
   type: 'object',
@@ -81,21 +68,16 @@ function appendLedger(line) {
   );
 }
 
-let mergeQueueTail = Promise.resolve();
-function enqueueMerge(fn) {
-  const next = mergeQueueTail.then(fn, fn);
-  mergeQueueTail = next.catch(() => {});
-  return next;
-}
-
-// Los agentes de fix hacen checkout de su rama task-<id> en el repo principal (no en un
-// worktree propio), y un repo git solo puede tener una rama checked out a la vez — dos
-// reviews fallidas concurrentes se pisarían el working tree. Misma solución que los
-// merges: una cola que los serializa.
-let fixQueueTail = Promise.resolve();
-function enqueueFix(fn) {
-  const next = fixQueueTail.then(fn, fn);
-  fixQueueTail = next.catch(() => {});
+// Serializa TODA operación que toca el working tree de repoPath: los merges (checkout de
+// la rama de integración) y los fixes (checkout de task-<id> sin worktree propio). Un
+// repo git solo puede tener una rama checked out a la vez, así que dos colas
+// independientes sobre el mismo árbol seguían pisándose entre sí — la carrera fix-vs-fix
+// estaba cerrada, pero fix-vs-merge no. El paralelismo real vive en los implement(), que
+// corren cada uno en su worktree aislado.
+let mainRepoQueueTail = Promise.resolve();
+function enqueueMainRepo(fn) {
+  const next = mainRepoQueueTail.then(fn, fn);
+  mainRepoQueueTail = next.catch(() => {});
   return next;
 }
 
@@ -109,10 +91,33 @@ function progressBar() {
 }
 
 // Único punto de incremento: toda rama terminal de runTask pasa por acá, para que la
-// barra no vuelva a desincronizarse cuando se agregue una rama nueva.
+// barra no vuelva a desincronizarse cuando se agregue una rama nueva. Idempotente por
+// tarea: las ramas específicas settlean con su etiqueta y la red de seguridad de
+// runTask no las cuenta dos veces.
+const settledTasks = new Set();
 function settle(taskId, label) {
+  if (settledTasks.has(taskId)) return;
+  settledTasks.add(taskId);
   settledCount += 1;
   log(`${progressBar()} — Task ${taskId} ${label}`);
+}
+
+// agent() devuelve null si el usuario saltea el agente o si murió por un error terminal
+// de API; sin este guard, ese null explotaba más adelante como un TypeError críptico
+// (p. ej. "Cannot read properties of null (reading 'status')").
+function ensureAgentResult(taskId, value, stage) {
+  if (value) return value;
+  throw new Error(`Task ${taskId}: ${stage} agent returned no result (skipped or terminal API error)`);
+}
+
+// BLOCKED/NEEDS_CONTEXT puede venir tanto del implement inicial como del fix round; el
+// chequeo vive acá para que ninguna de las dos rutas se lo saltee.
+async function assertNotBlocked(taskId, impl) {
+  if (impl.status !== 'BLOCKED' && impl.status !== 'NEEDS_CONTEXT') return;
+  const detail = impl.concerns ?? 'no detail given';
+  await appendLedger(`Task ${taskId}: ${impl.status} — ${detail}`);
+  settle(taskId, impl.status);
+  throw new Error(`Task ${taskId} ${impl.status}: ${detail}`);
 }
 
 async function implement(task) {
@@ -160,35 +165,44 @@ async function fix(task, impl, findings) {
   return agent(
     `On branch task-${task.id} in repo ${repoPath} (do not create a new worktree — check out ` +
     `that existing branch), fix these review findings for Task ${task.id}: ${findings}\n\n` +
+    `If git refuses the checkout because task-${task.id} is already checked out in another ` +
+    `worktree (the implementer's), run \`git worktree list\`, locate it, and do the work ` +
+    `inside that worktree instead.\n\n` +
     `Run \`date +%H:%M:%S\` first (startedAt) and again before reporting (finishedAt).\n\n` +
     `Re-run the tests covering your change and append the results to ` +
-    `${impl.reportFile}. Report back the new HEAD SHA as headSha (baseSha and branch stay ` +
-    `the same).`,
+    `${impl.reportFile}. Report back the new HEAD SHA as headSha; branch and ` +
+    `baseSha (${impl.baseSha}) stay the same.`,
     { label: `fix-${task.id}`, phase: 'Implement', schema: IMPLEMENTER_SCHEMA }
   );
 }
 
 async function runTask(taskId) {
-  const task = tasksById.get(taskId);
-  let impl;
   try {
-    impl = await implement(task);
+    return await executeTask(taskId);
   } catch (error) {
+    // Red de seguridad: cualquier salida de executeTask — también las no previstas —
+    // cuenta en la barra de progreso; settle es idempotente, así que las ramas que ya
+    // settlearon con una etiqueta específica no se cuentan dos veces.
     settle(taskId, 'FAILED');
     throw error;
   }
+}
 
-  if (impl.status === 'BLOCKED' || impl.status === 'NEEDS_CONTEXT') {
-    await appendLedger(`Task ${taskId}: ${impl.status} — ${impl.concerns ?? 'no detail given'}`);
-    settle(taskId, impl.status);
-    throw new Error(`Task ${taskId} ${impl.status}: ${impl.concerns ?? 'no detail given'}`);
-  }
+async function executeTask(taskId) {
+  const task = tasksById.get(taskId);
+  let impl = ensureAgentResult(taskId, await implement(task), 'implementer');
+  await assertNotBlocked(taskId, impl);
 
-  let verdict = await review(task, impl);
+  let verdict = ensureAgentResult(taskId, await review(task, impl), 'reviewer');
   if (verdict.qualityVerdict === 'NEEDS_FIXES' || verdict.specVerdict === 'FAIL') {
     log(`Task ${taskId}: review found issues, fixing once`);
-    impl = await enqueueFix(() => fix(task, impl, verdict.findings));
-    verdict = await review(task, impl);
+    impl = ensureAgentResult(
+      taskId,
+      await enqueueMainRepo(() => fix(task, impl, verdict.findings)),
+      'fix'
+    );
+    await assertNotBlocked(taskId, impl);
+    verdict = ensureAgentResult(taskId, await review(task, impl), 'reviewer');
     if (verdict.qualityVerdict === 'NEEDS_FIXES' || verdict.specVerdict === 'FAIL') {
       await appendLedger(`Task ${taskId}: blocked — review still failing after one fix round`);
       settle(taskId, 'FAILED (review)');
@@ -196,13 +210,17 @@ async function runTask(taskId) {
     }
   }
 
-  const mergeResult = await enqueueMerge(() =>
-    agent(
-      `Merge branch task-${taskId} into the integration branch of repo ${repoPath}. Report ` +
-      `mergeStatus MERGED on success. If there is a real merge conflict, do not resolve it ` +
-      `automatically — stop and report mergeStatus CONFLICT with the conflict details in "detail".`,
-      { label: `merge-${taskId}`, phase: 'Merge', schema: MERGE_SCHEMA }
-    )
+  const mergeResult = ensureAgentResult(
+    taskId,
+    await enqueueMainRepo(() =>
+      agent(
+        `Merge branch task-${taskId} into the integration branch of repo ${repoPath}. Report ` +
+        `mergeStatus MERGED on success. If there is a real merge conflict, do not resolve it ` +
+        `automatically — stop and report mergeStatus CONFLICT with the conflict details in "detail".`,
+        { label: `merge-${taskId}`, phase: 'Merge', schema: MERGE_SCHEMA }
+      )
+    ),
+    'merge'
   );
 
   if (mergeResult.mergeStatus === 'CONFLICT') {
