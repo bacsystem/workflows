@@ -105,10 +105,78 @@ durante la fase larga.
 - TDD real en las 4 tareas: RED verificado antes de implementar, GREEN al cerrar.
 - El ledger y los tiempos de pared (de los propios agentes) salieron correctos.
 
-## Veredicto
+## Veredicto (piloto 1)
 
 El workflow **funciona end-to-end**: produce código correcto, testeado, con historial
 git limpio y reportes trazables. Pero **F3 es bloqueante para uso real con paralelismo**:
 el aislamiento de implementadores no existe cuando el workflow apunta a un repo externo
 (el caso de uso principal). Corregir F3/F4 (worktrees propios del repo objetivo) antes
 del próximo run; F1 (CRLF del artefacto) merece un `.gitattributes`; F5 es cosmético.
+
+---
+
+# Piloto 2 — pilot-stats-2 (mismo día, v0.4.2)
+
+Mismo plan de 4 tareas en un repo fresco, corrido desde la rama con los fixes
+F1/F3/F4/F5 (PR #9), para validación 1:1 contra el piloto 1.
+
+## Fixes validados
+
+| Hallazgo | Resultado en el piloto 2 |
+|---|---|
+| **F3** (carrera de working tree) | ✅ Eliminada. Tareas 1 y 2 arrancaron con 3 s de diferencia, cada una en su worktree (`.worktrees/task-N`), commits en las ramas correctas desde el primer intento, `main` nunca se movió. |
+| **F4** (brief fuera del repo) | ✅ Briefs en `pilot-stats-2/.superpowers/sdd/`. |
+| **F5** (barra muda) | ✅ `Task N: started (implement)` visible al arrancar cada tarea. |
+| **F1** (CRLF del artefacto) | ✅ Lanzamiento a la primera, sin re-build manual. |
+
+**Paralelismo real medido**: el par 1∥2 tardó **2m46s de reloj** (2m34s y 2m43s
+solapados) contra ~13 minutos contaminados por contención en el piloto 1. La review
+final destacó además que los contratos de error de las dos tareas paralelas salieron
+**consistentes sin coordinación** — en el piloto 1 habían divergido (drift de mensajes).
+
+## Hallazgo nuevo
+
+### F6 — El clasificador de permisos del harness puede denegar agentes de merge a mitad del run
+
+El agente `merge-3` fue bloqueado por el clasificador de seguridad de la sesión ("merge
+sin revisión humana") — el mismo que había bloqueado un `gh pr merge` del orquestador
+más temprano. **El workflow degradó exactamente como fue diseñado**: task 3 FAILED, task
+4 SKIPPED en cascada con la causa raíz correcta, y la review final detectó con precisión
+el estado ("task-3 completa-pero-sin-mergear, merge sin conflicto posible; task 4 nunca
+construida — ready to merge: No").
+
+- Implicación: en entornos con clasificador activo, los merges del workflow necesitan
+  autorización humana previa/explícita, o el run queda a medias con trabajo varado en
+  ramas (recuperable: el diseño con `resumeFromRunId` + merge manual autorizado funcionó).
+- Recuperación ejercitada: merge manual de `task-3` autorizado por el usuario (20/20
+  tests en verde) + resume del run — las tareas 1-3 se reprodujeron desde caché y la
+  task 4 corrió fresca.
+
+Menor: en el objeto `results` retornado, el `error` de una tarea failed serializa como
+`{}` (los `Error` de JS no sobreviven a JSON); el mensaje sí está en el log de resumen.
+
+## Desenlace del piloto 2 (resume + merges autorizados)
+
+Con el merge manual de `task-3` autorizado por el usuario, el **resume**
+(`resumeFromRunId`) funcionó como está diseñado: las tareas 1-3 se reprodujeron desde
+caché, `merge-3` encontró el merge hecho y reportó MERGED (el ledger ganó su línea de
+task 3), y la **task 4 corrió fresca**: implement en su worktree + review PASS (23/23
+tests en su rama). El clasificador volvió a bloquear `merge-4` (F6, segunda ocurrencia
+— su justificación pide autorización que *nombre* específicamente la acción), así que el
+merge final también fue manual y autorizado.
+
+**Estado final del repo piloto: plan 4/4 completo, 23/23 tests en `main`, CLI verificado
+de punta a punta** (`stats-cli 1 2 3 4` → JSON correcto). La review final del resume
+además dejó recomendaciones de mejora *del formato de plan* (p. ej. `Consumes: None` en
+tareas hermanas produce validación duplicada por construcción — un plan podría declarar
+una task-0 de helpers compartidos).
+
+## Métricas (run inicial del piloto 2, antes del resume)
+
+| Métrica | Piloto 1 | Piloto 2 |
+|---|---|---|
+| Agentes | 19 | 12 (run cortado en merge-3) |
+| Tokens de subagentes | ~514k | ~291k |
+| Par paralelo 1∥2 (reloj) | ~13 min (contención) | **2m46s** |
+| Incidentes de ramas | 1 (auto-remediado) | **0** |
+| Rondas de fix | 0 | 0 |
