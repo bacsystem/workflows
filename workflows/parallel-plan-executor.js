@@ -224,7 +224,11 @@ function formatDuration(startedAt, finishedAt) {
 }
 
 
-const { graph, tasks, planPath, repoPath, integrationBranch } = args;
+// El harness puede entregar args como objeto o como string JSON según cómo se haya
+// invocado la tool (comprobado en el piloto 2026-07-15): destructurar el string daba
+// tasks undefined y un error que culpaba al campo equivocado.
+const resolvedArgs = typeof args === 'string' ? JSON.parse(args) : args;
+const { graph, tasks, planPath, repoPath, integrationBranch } = resolvedArgs;
 validateWorkflowArgs({ tasks, graph, integrationBranch }); // falla rápido y claro, nunca deadlock
 const tasksById = new Map(tasks.map((t) => [t.id, t]));
 

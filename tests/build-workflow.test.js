@@ -34,10 +34,17 @@ test('build script embeds the args validation and the template invokes it before
   );
 });
 
+test('built workflow tolerates args delivered as a JSON string (real harness behavior)', () => {
+  assert.ok(
+    output.includes("typeof args === 'string' ? JSON.parse(args) : args"),
+    'args puede llegar como string JSON según cómo se invoque la tool; destructurarlo sin parsear da tasks undefined'
+  );
+});
+
 test('built workflow names the integration branch explicitly instead of letting agents guess', () => {
   assert.ok(
-    output.includes('integrationBranch } = args'),
-    'integrationBranch debe venir de args'
+    output.includes('integrationBranch } = resolvedArgs'),
+    'integrationBranch debe venir de los args resueltos (objeto o string parseado)'
   );
   assert.ok(
     output.includes('into branch ${integrationBranch}'),

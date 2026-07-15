@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-07-15
+
+### Fixed
+
+- The workflow now tolerates `args` delivered as a JSON **string** (observed in the first
+  real end-to-end run: the harness handed the script a serialized string, destructuring
+  yielded `tasks: undefined` and startup validation aborted with a misleading message).
+  The template parses string args before destructuring.
+
+### Added
+
+- `docs/pilots/2026-07-15-pilot-stats-bitacora.md`: logbook of the first real pilot run —
+  findings, what worked, what to watch.
+
 ## [0.4.0] - 2026-07-15
 
 ### Changed
