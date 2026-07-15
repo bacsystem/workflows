@@ -152,6 +152,14 @@ test('built workflow logs task start so long implement phases show life (pilot F
   );
 });
 
+test('built workflow returns failure causes as messages, not raw Error objects (pilot 2/5)', () => {
+  assert.ok(
+    output.includes('r.error?.message ?? String(r.error)') &&
+      output.includes('serializableResults'),
+    'un Error de JS serializa a {} en JSON: el objeto results retornado perdía la causa de cada tarea failed'
+  );
+});
+
 test('built workflow settles every terminal branch and reconciles the progress bar', () => {
   assert.ok(output.includes('function settle('), 'progress accounting must be centralized in a settle() helper');
   assert.ok(output.includes("settle(taskId, 'FAILED (review)')"), 'the review-failed-after-fix branch must count as settled');

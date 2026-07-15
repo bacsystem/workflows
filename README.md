@@ -95,3 +95,6 @@ to authorize merges explicitly (naming branches and target) when prompted.
   only mitigation is keeping `Consumes`/`Produces` on one line per entry.
 - No speculative re-execution of an abnormally slow task (evaluated and deferred, see
   design spec §7) — right-sizing tasks in the plan itself is the current mitigation.
+- `task-<id>` branches of failed or BLOCKED tasks survive the run on purpose: they
+  preserve whatever partial state exists for diagnosis. Clean them up afterwards with
+  `git branch -D task-<id>` once you no longer need them.
