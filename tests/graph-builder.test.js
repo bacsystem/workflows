@@ -27,6 +27,18 @@ test('infers a dependency from overlapping Files even without a matching symbol'
   assert.deepEqual(graph[2], [1]);
 });
 
+test('serializa en cadena las tareas que tocan el mismo archivo', () => {
+  const tasks = [
+    { id: 1, title: 'A', files: { create: ['src/shared.js'], modify: [], test: [] }, interfaces: { consumes: [], produces: [] } },
+    { id: 2, title: 'B', files: { create: [], modify: ['src/shared.js'], test: [] }, interfaces: { consumes: [], produces: [] } },
+    { id: 3, title: 'C', files: { create: [], modify: ['src/shared.js'], test: [] }, interfaces: { consumes: [], produces: [] } },
+  ];
+  const graph = buildGraph(tasks);
+  assert.deepEqual(graph[1], []);
+  assert.deepEqual(graph[2], [1]);
+  assert.deepEqual(graph[3], [2], 'la tarea 3 debe depender del ÚLTIMO que tocó el archivo, no del primero');
+});
+
 test('throws on a cyclic dependency', () => {
   const tasks = [
     { id: 1, title: 'A', files: { create: [], modify: [], test: [] }, interfaces: { consumes: ['b'], produces: ['a'] } },

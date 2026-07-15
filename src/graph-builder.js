@@ -19,12 +19,11 @@ export function buildGraph(tasks) {
 
     const touchedFiles = [...task.files.create, ...task.files.modify, ...task.files.test];
     for (const file of touchedFiles) {
-      const owner = fileOwner.get(file);
-      if (owner === undefined) {
-        fileOwner.set(file, task.id);
-      } else if (owner !== task.id) {
-        deps.get(task.id).add(owner);
+      const previousOwner = fileOwner.get(file);
+      if (previousOwner !== undefined && previousOwner !== task.id) {
+        deps.get(task.id).add(previousOwner);
       }
+      fileOwner.set(file, task.id); // el último que lo toca pasa a ser el dueño
     }
   }
 
