@@ -30,6 +30,8 @@ npm test       # run the unit tests
 npm run build  # regenerate workflows/parallel-plan-executor.js after any src/ change
 
 # 1. Compute the task graph for your plan
+#    (stdout is pure JSON; ambiguity warnings — e.g. two tasks producing the same
+#    symbol — go to stderr and are also included in the JSON's "warnings" field)
 node bin/parse-plan.js /path/to/your-plan.md > /tmp/plan-graph.json
 
 # 2. Ask Claude Code to invoke the Workflow tool with:
@@ -39,6 +41,19 @@ node bin/parse-plan.js /path/to/your-plan.md > /tmp/plan-graph.json
 #            planPath: "/path/to/your-plan.md",
 #            repoPath: "/path/to/your/project" }
 ```
+
+## Safety checks (v0.2)
+
+- **Startup validation**: the workflow validates `args` before launching any agent —
+  a cyclic graph or an id present in `graph` but missing from `tasks` fails fast with a
+  clear error instead of deadlocking `runDag` silently.
+- **Same-file chaining**: tasks touching the same file are serialized as a chain (each
+  depends on the *last* task to touch it), so they never run in parallel against each
+  other.
+- **Duplicate-producer warnings**: two tasks declaring the same `Produces` symbol is
+  surfaced as a warning (first producer still wins); it does not abort the run.
+- **Skip reasons point at the root cause**: a task skipped through a cascade reports the
+  task that originally failed, not the intermediate skipped link.
 
 ## Known limitations (v1)
 
