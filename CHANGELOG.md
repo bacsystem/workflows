@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-07-15
+
+### Changed
+
+- **BREAKING (args contract)**: the workflow now requires `args.integrationBranch` — the
+  branch every `task-<id>` merges into. Previously each merge agent (and the final
+  whole-branch review) had to guess "the integration branch"; in a repo with both
+  `master` and `develop`, two agents could pick different branches and both report
+  MERGED. Startup validation fails fast when the arg is missing or empty, and the merge
+  and final-review prompts interpolate the explicit branch name.
+
 ## [0.3.0] - 2026-07-15
 
 ### Added

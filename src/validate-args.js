@@ -4,12 +4,18 @@ import { assertAcyclic, assertUniqueTaskIds } from './graph-builder.js';
 // un ciclo en ese grafo deja a runDag esperando su propia promesa memoizada para
 // siempre — deadlock sin error ni log. Esta validación corre antes de lanzar cualquier
 // agente para que el fallo sea inmediato y explicable.
-export function validateWorkflowArgs({ tasks, graph }) {
+export function validateWorkflowArgs({ tasks, graph, integrationBranch }) {
   if (!Array.isArray(tasks) || tasks.length === 0) {
     throw new Error('args.tasks must be a non-empty array');
   }
   if (!graph || typeof graph !== 'object') {
     throw new Error('args.graph must be an object');
+  }
+  if (typeof integrationBranch !== 'string' || integrationBranch.trim() === '') {
+    // Sin rama explícita, cada agente de merge (y el review final) "adivina" cuál es la
+    // rama de integración — en un repo con master y develop pueden elegir distinto y
+    // ambos reportar MERGED. Mejor exigirla de entrada.
+    throw new Error('args.integrationBranch must name the branch merges target (e.g. "develop")');
   }
 
   assertUniqueTaskIds(tasks);
