@@ -293,4 +293,14 @@ const summaryLines = [...results.entries()].map(([id, r]) => {
 log(summaryLines.join('\n'));
 if (finalReview) log(`Final whole-branch review:\n${finalReview}`);
 
-return { results: Object.fromEntries(results), finalReview };
+// Un Error de JS serializa a {} al pasar por JSON: sin este mapeo, el objeto retornado
+// perdía la causa de cada tarea failed (piloto 2/5 — el mensaje solo quedaba en los logs).
+const serializableResults = Object.fromEntries(
+  [...results.entries()].map(([id, r]) => [
+    id,
+    r.status === 'failed'
+      ? { status: 'failed', error: r.error?.message ?? String(r.error) }
+      : r,
+  ])
+);
+return { results: serializableResults, finalReview };
