@@ -122,6 +122,36 @@ test('built workflow inlines the shared time helpers instead of redefining them'
   );
 });
 
+test('built workflow gives each implementer its own worktree of the TARGET repo (pilot F3)', () => {
+  assert.ok(
+    output.includes('git -C ${repoPath} worktree add'),
+    'el prompt de implement debe ordenar crear un worktree del repo objetivo'
+  );
+  assert.ok(
+    !output.includes("isolation: 'worktree'"),
+    "isolation:'worktree' aísla el repo de la SESIÓN, no repoPath — dos implementadores compartían el working tree del objetivo"
+  );
+  assert.ok(
+    output.includes('git -C ${repoPath} worktree remove'),
+    'el worktree se libera al terminar, dejando la rama task-N disponible para el fix round'
+  );
+});
+
+test('built workflow makes sure the task brief lands in the target repo (pilot F4)', () => {
+  assert.ok(
+    output.includes('copy it to') &&
+      output.includes('${repoPath}/.superpowers/sdd/task-${task.id}-brief.md'),
+    'task-brief escribe en el cwd del agente; el implement debe garantizar el brief bajo repoPath'
+  );
+});
+
+test('built workflow logs task start so long implement phases show life (pilot F5)', () => {
+  assert.ok(
+    output.includes('started (implement)'),
+    'sin log de inicio, la barra queda muda hasta el primer settle (~10 min en el piloto 1)'
+  );
+});
+
 test('built workflow settles every terminal branch and reconciles the progress bar', () => {
   assert.ok(output.includes('function settle('), 'progress accounting must be centralized in a settle() helper');
   assert.ok(output.includes("settle(taskId, 'FAILED (review)')"), 'the review-failed-after-fix branch must count as settled');

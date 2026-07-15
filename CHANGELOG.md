@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2026-07-15
+
+### Fixed
+
+- **Pilot finding F3 (blocking for real parallel use)**: the harness's
+  `isolation: 'worktree'` isolates the *session* repo, not `repoPath` — in the first
+  end-to-end run both parallel implementers shared the target repo's single working tree
+  and their branches raced (task-2's commit landed on task-1; the agents self-remediated).
+  Implement agents now create their **own worktree of the target repo**
+  (`git worktree add <repo>/.worktrees/task-N -b task-N`), work entirely inside it, and
+  release it when done — which also frees `task-N` for the fix round (the old
+  checkout-conflict caveat disappears).
+- Pilot finding F4: `task-brief` writes the brief into the agent's cwd; the implement
+  prompt now ensures a copy lands under `<repoPath>/.superpowers/sdd/` where the reviewer
+  reads it.
+- Pilot finding F5: the workflow logs `Task N: started (implement)` when a task begins —
+  previously the progress bar only emitted on settlement, leaving the first ~10 minutes
+  of a run silent.
+- Pilot finding F1: `.gitattributes` forces LF on `workflows/*.js` so the checked-out
+  artifact is never rejected by the Workflow permission dialog for CRLF control characters.
+
 ## [0.4.1] - 2026-07-15
 
 ### Fixed
