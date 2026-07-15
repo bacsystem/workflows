@@ -48,11 +48,28 @@ async function runDag(graph, taskFn) {
 }
 
 
-function buildGraph(tasks) {
-  const producedBy = new Map(); // symbol -> taskId
+function buildGraphWithDiagnostics(tasks) {
+  const warnings = [];
+  const producersOf = new Map(); // symbol -> [taskIds en orden de aparición]
   for (const task of tasks) {
     for (const symbol of task.interfaces.produces) {
-      if (!producedBy.has(symbol)) producedBy.set(symbol, task.id);
+      if (!producersOf.has(symbol)) producersOf.set(symbol, []);
+      const producers = producersOf.get(symbol);
+      if (!producers.includes(task.id)) producers.push(task.id);
+    }
+  }
+
+  const producedBy = new Map(); // symbol -> taskId (el primer productor gana)
+  for (const [symbol, producers] of producersOf) {
+    producedBy.set(symbol, producers[0]);
+    if (producers.length > 1) {
+      // Ambigüedad real del plan (dos tareas dicen crear lo mismo): es warning, no
+      // error — no impide ejecutar, pero el usuario debe enterarse en vez de que se
+      // resuelva en silencio por orden de aparición.
+      warnings.push(
+        `Symbol ${symbol} is declared as produced by tasks ${producers.join(', ')} — ` +
+        `first producer wins (task ${producers[0]})`
+      );
     }
   }
 
@@ -83,7 +100,11 @@ function buildGraph(tasks) {
   }
 
   assertAcyclic(graph);
-  return graph;
+  return { graph, warnings };
+}
+
+function buildGraph(tasks) {
+  return buildGraphWithDiagnostics(tasks).graph;
 }
 
 function assertAcyclic(graph) {

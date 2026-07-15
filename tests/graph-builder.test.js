@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { parsePlan } from '../src/plan-parser.js';
-import { buildGraph, assertAcyclic } from '../src/graph-builder.js';
+import { buildGraph, buildGraphWithDiagnostics, assertAcyclic } from '../src/graph-builder.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -53,6 +53,26 @@ test('assertAcyclic detecta un ciclo en un grafo ya construido', () => {
 
 test('assertAcyclic acepta un DAG válido', () => {
   assert.doesNotThrow(() => assertAcyclic({ 1: [], 2: [1], 3: [1, 2] }));
+});
+
+test('reporta un símbolo declarado por dos productores', () => {
+  const tasks = [
+    { id: 1, title: 'A', files: { create: [], modify: [], test: [] }, interfaces: { consumes: [], produces: ['createWidget'] } },
+    { id: 2, title: 'B', files: { create: [], modify: [], test: [] }, interfaces: { consumes: [], produces: ['createWidget'] } },
+  ];
+  const { graph, warnings } = buildGraphWithDiagnostics(tasks);
+  assert.match(warnings.join('\n'), /createWidget .* tasks 1, 2/);
+  assert.deepEqual(graph[1], [], 'el primer productor sigue ganando: el grafo no cambia');
+  assert.deepEqual(graph[2], []);
+});
+
+test('no emite warnings cuando cada símbolo tiene un solo productor', () => {
+  const tasks = [
+    { id: 1, title: 'A', files: { create: [], modify: [], test: [] }, interfaces: { consumes: [], produces: ['createWidget'] } },
+    { id: 2, title: 'B', files: { create: [], modify: [], test: [] }, interfaces: { consumes: ['createWidget'], produces: [] } },
+  ];
+  const { warnings } = buildGraphWithDiagnostics(tasks);
+  assert.deepEqual(warnings, []);
 });
 
 test('builds a real graph from a business-core plan excerpt', () => {
