@@ -9,9 +9,20 @@ export function inlineSource(text) {
     // recién explotaría al ejecutar el workflow. Mejor reventar en el build.
     throw new Error('inlineSource cannot inline an "export default" — use named exports');
   }
-  return normalized
-    // Cubre imports de una o varias líneas: "import { a,\n b } from 'x';" y también
-    // los side-effect imports sin "from" ("import 'x';").
-    .replace(/^import\s+(?:[^'"]*?from\s+)?['"][^'"]*['"];?[ \t]*\n/gm, '')
+  if (/^export\s*(\{|\*)/m.test(normalized)) {
+    // "export { f as default };" o "export * from ..." quedarían como "{ f as default };"
+    // o "* from ..." — también sintaxis inválida diferida.
+    throw new Error('inlineSource cannot inline "export {...}"/"export * from" — use named declaration exports');
+  }
+  const stripped = normalized
+    // Cubre imports de una o varias líneas (los especificadores no contienen ';'),
+    // side-effect imports sin "from", y un comentario // al final de la línea.
+    .replace(/^import\s+(?:[^'";]*?from\s+)?['"][^'"]*['"];?[ \t]*(?:\/\/[^\n]*)?\n/gm, '')
     .replace(/^export\s+/gm, '');
+  if (/^import\s/m.test(stripped)) {
+    // Cualquier forma de import que el regex no cubra debe reventar acá, no cuando el
+    // sandbox sin imports cargue el artefacto generado.
+    throw new Error('inlineSource left an import behind — unsupported import form in this module');
+  }
+  return stripped;
 }

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.0] - 2026-07-15
 
+### Added
+
+- `parsePlanWithDiagnostics`: a `Consumes`/`Produces` line with content but no
+  backtick-quoted symbol now emits a warning (surfaced by the CLI on stderr and in the
+  JSON `warnings` field) instead of being dropped in complete silence.
+- `assertUniqueTaskIds` shared guard: duplicate task ids are now rejected in the parser,
+  in `buildGraph`/`buildGraphWithDiagnostics` (the module whose Map actually collapsed
+  them), and in the workflow's args validation — one implementation, three entry points.
+
 ### Changed
 
 - **Symbol extraction now only considers backtick-quoted spans** in `Consumes`/`Produces`
@@ -40,7 +49,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the previous `**Files:**`/`**Interfaces:**` section during parsing.
 - Build hardening: placeholder substitution uses a replacer function so `$&`-style
   patterns in inlined code can't corrupt the artifact; `inline-source` strips multi-line
-  imports whole and fails loudly on `export default`.
+  imports whole (including a trailing `//` comment) and fails loudly on `export default`,
+  re-exports (`export {...}` / `export * from`), and any import form it could not strip —
+  previously those shipped invalid syntax that only exploded when the sandbox loaded the
+  generated workflow.
+- Backtick-quoted file paths in `Consumes`/`Produces` count as a single whole-path symbol;
+  tokenizing them made fragments like `src` a symbol shared by half the plan, recreating
+  the spurious-dependency problem for path-heavy plans.
+- Line-range stripping also handles multi-range suffixes (`:10-20,40-55`), which the 0.3.0
+  single-range regex left attached to the path, breaking same-file chaining.
+- A bold annotation with trailing text (`**Watch Out:** ...`) inside a section no longer
+  terminates it (entries after it were silently dropped); only a bold header occupying the
+  whole line does, and header names may now contain digits, hyphens or `&`
+  (`**Non-Goals:**`).
+- Ledger appends go through the same main-repo queue as fixes and merges (two tasks
+  failing simultaneously raced on `.superpowers/sdd/progress.md`), and the ledger line is
+  framed in `<line>` tags so quotes in free-form agent text can't break the prompt.
+- `formatDuration`/`hhmmssToSeconds` accept 1–2 digit components but validate ranges:
+  `10:75:00` now yields `duration unknown` instead of a confidently wrong duration.
 
 ## [0.2.1] - 2026-07-15
 

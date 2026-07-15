@@ -46,3 +46,20 @@ test('quita un import multilínea completo, no solo su primera línea', () => {
 test('falla ruidosamente ante un export default, que dejaría sintaxis inválida', () => {
   assert.throws(() => inlineSource('export default function f() {}\n'), /export default/);
 });
+
+test('quita un import aunque tenga un comentario al final de la línea', () => {
+  const inlined = inlineSource("import { x } from './x.js'; // shared helper\nconst a = x;\n");
+  assert.ok(!inlined.includes('import'), 'el comentario final no debe impedir el stripping');
+  assert.ok(inlined.includes('const a = x;'));
+});
+
+test('falla ruidosamente ante re-exports y export-as-default, que dejarían sintaxis inválida', () => {
+  assert.throws(() => inlineSource("export * from './x.js';\n"), /export/);
+  assert.throws(() => inlineSource('export { f as default };\n'), /export/);
+});
+
+test('falla ruidosamente si queda algún import sin eliminar en el resultado', () => {
+  // Forma de import que el regex de stripping no cubre: mejor reventar en el build que
+  // enviar un artefacto que explota recién al cargarlo el sandbox sin imports.
+  assert.throws(() => inlineSource("import x\n  from './y.js' whatever\nconst a = 1;\n"), /import/i);
+});

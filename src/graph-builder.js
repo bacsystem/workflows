@@ -1,4 +1,19 @@
+// Dos tareas con el mismo id colapsarían en una sola entrada del grafo (y de tasksById
+// en el workflow) y una de ellas nunca se ejecutaría, sin que nadie lo reporte. Vive acá
+// porque este módulo es dueño del Map que colapsa; el parser y validateWorkflowArgs lo
+// reutilizan como guard de sus propios puntos de entrada.
+export function assertUniqueTaskIds(tasks) {
+  const seen = new Set();
+  for (const task of tasks) {
+    if (seen.has(task.id)) {
+      throw new Error(`Duplicate task id ${task.id}`);
+    }
+    seen.add(task.id);
+  }
+}
+
 export function buildGraphWithDiagnostics(tasks) {
+  assertUniqueTaskIds(tasks);
   const warnings = [];
   const producersOf = new Map(); // symbol -> [taskIds en orden de aparición]
   for (const task of tasks) {

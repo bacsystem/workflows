@@ -61,11 +61,16 @@ const MERGE_SCHEMA = {
 };
 
 function appendLedger(line) {
-  return agent(
-    `In repo ${repoPath}, append this exact line to .superpowers/sdd/progress.md ` +
-    `(create the file and its directory if missing): "${line}"`,
+  // Pasa por la misma cola que fixes y merges: dos tareas fallando a la vez hacían
+  // append concurrente sobre el mismo archivo del repo principal. El contenido va entre
+  // <line></line> porque incluye texto libre de otros agentes (concerns, findings) —
+  // una comilla en ese texto rompía el framing del prompt.
+  return enqueueMainRepo(() => agent(
+    `In repo ${repoPath}, append to .superpowers/sdd/progress.md (create the file and ` +
+    `its directory if missing) exactly the single line between the <line> tags below, ` +
+    `without the tags:\n<line>${line}</line>`,
     { label: 'ledger', phase: 'Merge' }
-  );
+  ));
 }
 
 // Serializa TODA operación que toca el working tree de repoPath: los merges (checkout de
@@ -229,12 +234,13 @@ async function executeTask(taskId) {
     throw new Error(`Task ${taskId} merge CONFLICT: ${mergeResult.detail ?? 'no detail given'}`);
   }
 
+  const duration = formatDuration(impl.startedAt, impl.finishedAt);
   await appendLedger(
     `Task ${taskId}: complete ${impl.startedAt}..${impl.finishedAt} ` +
-    `(${formatDuration(impl.startedAt, impl.finishedAt)}, commits ` +
+    `(${duration}, commits ` +
     `${impl.baseSha.slice(0, 7)}..${impl.headSha.slice(0, 7)}, review clean)`
   );
-  settle(taskId, `done in ${formatDuration(impl.startedAt, impl.finishedAt)}`);
+  settle(taskId, `done in ${duration}`);
   return impl;
 }
 

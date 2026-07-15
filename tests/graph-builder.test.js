@@ -75,6 +75,14 @@ test('no emite warnings cuando cada símbolo tiene un solo productor', () => {
   assert.deepEqual(warnings, []);
 });
 
+test('buildGraph rechaza ids duplicados en vez de colapsarlos en silencio', () => {
+  const dup = [
+    { id: 1, title: 'A', files: { create: [], modify: [], test: [] }, interfaces: { consumes: [], produces: [] } },
+    { id: 1, title: 'B', files: { create: [], modify: [], test: [] }, interfaces: { consumes: [], produces: [] } },
+  ];
+  assert.throws(() => buildGraph(dup), /[Dd]uplicate task id 1/);
+});
+
 test('builds a real graph from a business-core plan excerpt', () => {
   const excerpt = readFileSync(path.join(here, 'fixtures/business-core-excerpt.md'), 'utf8');
   const tasks = parsePlan(excerpt);

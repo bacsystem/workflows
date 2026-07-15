@@ -26,7 +26,7 @@ The project is split in two halves because the Workflow sandbox has no filesyste
    - `bin/parse-plan.js` ties both together and prints `{ tasks, graph }` as JSON, which the user passes as the Workflow's `args` along with `planPath` and `repoPath`.
 
 2. **Workflow execution** (`workflows/`):
-   - `workflows/parallel-plan-executor.js` is **generated** — never edit it by hand. It is built by `scripts/build-workflow.js`, which inlines `src/scheduler.js` into `workflows/parallel-plan-executor.template.js` at the `/* __SCHEDULER_SOURCE__ */` placeholder. After changing `src/scheduler.js` or the template, run `npm run build` and commit both the source and the regenerated file.
+   - `workflows/parallel-plan-executor.js` is **generated** — never edit it by hand. It is built by `scripts/build-workflow.js`, which inlines `src/scheduler.js`, `src/graph-builder.js` + `src/validate-args.js`, and `src/time.js` into `workflows/parallel-plan-executor.template.js` at the `/* __SCHEDULER_SOURCE__ */`, `/* __VALIDATION_SOURCE__ */` and `/* __TIME_SOURCE__ */` placeholders. After changing any of those inlined modules or the template, run `npm run build` and commit both the source and the regenerated file.
    - Per task: implement in an isolated git worktree (branch `task-<id>`) → adversarial review (spec PASS/FAIL + quality APPROVED/NEEDS_FIXES) → at most one fix round → serialized merge (one at a time, DAG order). A failed task (including merge CONFLICT, BLOCKED, NEEDS_CONTEXT) cascades SKIP to all transitive dependents.
    - Wall-clock times come from the agents themselves (they run `date`); the script only does string math on `HH:MM:SS` values.
 

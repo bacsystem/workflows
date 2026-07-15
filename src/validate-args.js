@@ -1,4 +1,4 @@
-import { assertAcyclic } from './graph-builder.js';
+import { assertAcyclic, assertUniqueTaskIds } from './graph-builder.js';
 
 // El workflow recibe tasks/graph como JSON pegado a mano por el usuario (ver README);
 // un ciclo en ese grafo deja a runDag esperando su propia promesa memoizada para
@@ -12,15 +12,8 @@ export function validateWorkflowArgs({ tasks, graph }) {
     throw new Error('args.graph must be an object');
   }
 
-  const taskIds = new Set();
-  for (const task of tasks) {
-    if (taskIds.has(task.id)) {
-      // Dos tareas con el mismo id colapsan en una sola entrada de tasksById y una de
-      // ellas nunca se ejecutaría, sin que nadie lo reporte.
-      throw new Error(`Duplicate task id ${task.id} in tasks`);
-    }
-    taskIds.add(task.id);
-  }
+  assertUniqueTaskIds(tasks);
+  const taskIds = new Set(tasks.map((t) => t.id));
 
   for (const key of Object.keys(graph)) {
     const id = Number(key);

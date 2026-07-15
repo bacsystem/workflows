@@ -8,10 +8,12 @@ import path from 'node:path';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
 
-test('build script embeds the scheduler source and strips its export, keeping only the meta export', () => {
-  execFileSync('node', [path.join(root, 'scripts', 'build-workflow.js')]);
-  const output = readFileSync(path.join(root, 'workflows', 'parallel-plan-executor.js'), 'utf8');
+// El build es determinista: se corre UNA vez y todos los tests aseveran sobre el mismo
+// artefacto, en vez de gastar un proceso node por test.
+execFileSync('node', [path.join(root, 'scripts', 'build-workflow.js')]);
+const output = readFileSync(path.join(root, 'workflows', 'parallel-plan-executor.js'), 'utf8');
 
+test('build script embeds the scheduler source and strips its export, keeping only the meta export', () => {
   assert.ok(output.includes('async function runDag('));
   assert.ok(!output.includes('__SCHEDULER_SOURCE__'));
   assert.ok(!output.includes('export async function runDag'));
@@ -20,9 +22,6 @@ test('build script embeds the scheduler source and strips its export, keeping on
 });
 
 test('build script embeds the args validation and the template invokes it before any agent', () => {
-  execFileSync('node', [path.join(root, 'scripts', 'build-workflow.js')]);
-  const output = readFileSync(path.join(root, 'workflows', 'parallel-plan-executor.js'), 'utf8');
-
   assert.ok(output.includes('function validateWorkflowArgs('));
   assert.ok(output.includes('function assertAcyclic('));
   assert.ok(!output.includes('__VALIDATION_SOURCE__'));
@@ -34,17 +33,14 @@ test('build script embeds the args validation and the template invokes it before
 });
 
 test('built workflow serializes every main-repo working-tree operation through one queue', () => {
-  execFileSync('node', [path.join(root, 'scripts', 'build-workflow.js')]);
-  const output = readFileSync(path.join(root, 'workflows', 'parallel-plan-executor.js'), 'utf8');
-
   assert.ok(output.includes('function enqueueMainRepo('));
   assert.ok(
     output.includes('enqueueMainRepo(() => fix(task, impl'),
     'fix() debe pasar por la cola del repo principal'
   );
   assert.equal(
-    (output.match(/enqueueMainRepo\(/g) ?? []).length, 3,
-    'exactamente tres apariciones: la definición, el call site de fix y el de merge'
+    (output.match(/enqueueMainRepo\(/g) ?? []).length, 4,
+    'exactamente cuatro apariciones: la definición y los call sites de ledger, fix y merge'
   );
   assert.ok(
     !output.includes('fixQueueTail') && !output.includes('mergeQueueTail'),
@@ -56,10 +52,14 @@ test('built workflow serializes every main-repo working-tree operation through o
   );
 });
 
-test('built workflow guards every agent result against null (user skip / terminal API error)', () => {
-  execFileSync('node', [path.join(root, 'scripts', 'build-workflow.js')]);
-  const output = readFileSync(path.join(root, 'workflows', 'parallel-plan-executor.js'), 'utf8');
+test('built workflow frames ledger content so free-form agent text cannot break the prompt', () => {
+  assert.ok(
+    output.includes('<line>${line}</line>'),
+    'la línea del ledger debe ir delimitada, no incrustada entre comillas'
+  );
+});
 
+test('built workflow guards every agent result against null (user skip / terminal API error)', () => {
   assert.ok(output.includes('function ensureAgentResult('), 'debe existir un guard centralizado');
   assert.equal(
     (output.match(/ensureAgentResult\(/g) ?? []).length, 6,
@@ -68,9 +68,6 @@ test('built workflow guards every agent result against null (user skip / termina
 });
 
 test('built workflow re-checks BLOCKED/NEEDS_CONTEXT after the fix round, not only after implement', () => {
-  execFileSync('node', [path.join(root, 'scripts', 'build-workflow.js')]);
-  const output = readFileSync(path.join(root, 'workflows', 'parallel-plan-executor.js'), 'utf8');
-
   assert.ok(output.includes('function assertNotBlocked('), 'el chequeo de BLOCKED debe estar centralizado');
   assert.equal(
     (output.match(/assertNotBlocked\(/g) ?? []).length, 3,
@@ -79,9 +76,6 @@ test('built workflow re-checks BLOCKED/NEEDS_CONTEXT after the fix round, not on
 });
 
 test('built workflow hands the fix agent its baseSha instead of asking it to guess', () => {
-  execFileSync('node', [path.join(root, 'scripts', 'build-workflow.js')]);
-  const output = readFileSync(path.join(root, 'workflows', 'parallel-plan-executor.js'), 'utf8');
-
   assert.ok(
     output.includes('baseSha (${impl.baseSha}) stay the same'),
     'el prompt de fix debe interpolar el baseSha original, no pedirle al agente que lo adivine'
@@ -89,9 +83,6 @@ test('built workflow hands the fix agent its baseSha instead of asking it to gue
 });
 
 test('built workflow inlines the shared time helpers instead of redefining them', () => {
-  execFileSync('node', [path.join(root, 'scripts', 'build-workflow.js')]);
-  const output = readFileSync(path.join(root, 'workflows', 'parallel-plan-executor.js'), 'utf8');
-
   assert.ok(output.includes('function formatDuration('));
   assert.ok(
     output.includes('TIME_RE'),
@@ -104,9 +95,6 @@ test('built workflow inlines the shared time helpers instead of redefining them'
 });
 
 test('built workflow settles every terminal branch and reconciles the progress bar', () => {
-  execFileSync('node', [path.join(root, 'scripts', 'build-workflow.js')]);
-  const output = readFileSync(path.join(root, 'workflows', 'parallel-plan-executor.js'), 'utf8');
-
   assert.ok(output.includes('function settle('), 'progress accounting must be centralized in a settle() helper');
   assert.ok(output.includes("settle(taskId, 'FAILED (review)')"), 'the review-failed-after-fix branch must count as settled');
   assert.ok(output.includes('settledCount = results.size'), 'skipped tasks must be reconciled after runDag');

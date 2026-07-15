@@ -53,7 +53,22 @@ async function runDag(graph, taskFn) {
 }
 
 
+// Dos tareas con el mismo id colapsarían en una sola entrada del grafo (y de tasksById
+// en el workflow) y una de ellas nunca se ejecutaría, sin que nadie lo reporte. Vive acá
+// porque este módulo es dueño del Map que colapsa; el parser y validateWorkflowArgs lo
+// reutilizan como guard de sus propios puntos de entrada.
+function assertUniqueTaskIds(tasks) {
+  const seen = new Set();
+  for (const task of tasks) {
+    if (seen.has(task.id)) {
+      throw new Error(`Duplicate task id ${task.id}`);
+    }
+    seen.add(task.id);
+  }
+}
+
 function buildGraphWithDiagnostics(tasks) {
+  assertUniqueTaskIds(tasks);
   const warnings = [];
   const producersOf = new Map(); // symbol -> [taskIds en orden de aparición]
   for (const task of tasks) {
@@ -149,15 +164,8 @@ function validateWorkflowArgs({ tasks, graph }) {
     throw new Error('args.graph must be an object');
   }
 
-  const taskIds = new Set();
-  for (const task of tasks) {
-    if (taskIds.has(task.id)) {
-      // Dos tareas con el mismo id colapsan en una sola entrada de tasksById y una de
-      // ellas nunca se ejecutaría, sin que nadie lo reporte.
-      throw new Error(`Duplicate task id ${task.id} in tasks`);
-    }
-    taskIds.add(task.id);
-  }
+  assertUniqueTaskIds(tasks);
+  const taskIds = new Set(tasks.map((t) => t.id));
 
   for (const key of Object.keys(graph)) {
     const id = Number(key);
@@ -184,19 +192,27 @@ function validateWorkflowArgs({ tasks, graph }) {
 // El sandbox del Workflow prohíbe Date.now()/new Date() (determinismo del resume), así
 // que los tiempos de pared vienen de los propios agentes (corren `date +%H:%M:%S`); acá
 // solo se hace aritmética de strings sobre valores HH:MM:SS que pueden venir malformados
-// — un agente es texto libre, no un reloj.
-const TIME_RE = /^\d{1,2}:\d{2}:\d{2}$/;
+// — un agente es texto libre, no un reloj. Componentes de 1 o 2 dígitos, con rangos
+// validados: "10:75:00" no es una hora, es basura que antes se convertía en duración.
+const TIME_RE = /^(\d{1,2}):(\d{1,2}):(\d{1,2})$/;
 
-function hhmmssToSeconds(t) {
-  const [h, m, s] = t.split(':').map(Number);
+function parseHHMMSS(t) {
+  const match = TIME_RE.exec(t ?? '');
+  if (!match) return null;
+  const [h, m, s] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  if (h > 23 || m > 59 || s > 59) return null;
   return h * 3600 + m * 60 + s;
 }
 
+function hhmmssToSeconds(t) {
+  return parseHHMMSS(t);
+}
+
 function formatDuration(startedAt, finishedAt) {
-  if (!TIME_RE.test(startedAt ?? '') || !TIME_RE.test(finishedAt ?? '')) {
-    return 'duration unknown';
-  }
-  let secs = hhmmssToSeconds(finishedAt) - hhmmssToSeconds(startedAt);
+  const start = parseHHMMSS(startedAt);
+  const end = parseHHMMSS(finishedAt);
+  if (start === null || end === null) return 'duration unknown';
+  let secs = end - start;
   if (secs < 0) secs += 24 * 3600; // crossed midnight
   return `${Math.floor(secs / 60)}m${String(secs % 60).padStart(2, '0')}s`;
 }
@@ -248,11 +264,16 @@ const MERGE_SCHEMA = {
 };
 
 function appendLedger(line) {
-  return agent(
-    `In repo ${repoPath}, append this exact line to .superpowers/sdd/progress.md ` +
-    `(create the file and its directory if missing): "${line}"`,
+  // Pasa por la misma cola que fixes y merges: dos tareas fallando a la vez hacían
+  // append concurrente sobre el mismo archivo del repo principal. El contenido va entre
+  // <line></line> porque incluye texto libre de otros agentes (concerns, findings) —
+  // una comilla en ese texto rompía el framing del prompt.
+  return enqueueMainRepo(() => agent(
+    `In repo ${repoPath}, append to .superpowers/sdd/progress.md (create the file and ` +
+    `its directory if missing) exactly the single line between the <line> tags below, ` +
+    `without the tags:\n<line>${line}</line>`,
     { label: 'ledger', phase: 'Merge' }
-  );
+  ));
 }
 
 // Serializa TODA operación que toca el working tree de repoPath: los merges (checkout de
@@ -416,12 +437,13 @@ async function executeTask(taskId) {
     throw new Error(`Task ${taskId} merge CONFLICT: ${mergeResult.detail ?? 'no detail given'}`);
   }
 
+  const duration = formatDuration(impl.startedAt, impl.finishedAt);
   await appendLedger(
     `Task ${taskId}: complete ${impl.startedAt}..${impl.finishedAt} ` +
-    `(${formatDuration(impl.startedAt, impl.finishedAt)}, commits ` +
+    `(${duration}, commits ` +
     `${impl.baseSha.slice(0, 7)}..${impl.headSha.slice(0, 7)}, review clean)`
   );
-  settle(taskId, `done in ${formatDuration(impl.startedAt, impl.finishedAt)}`);
+  settle(taskId, `done in ${duration}`);
   return impl;
 }
 
