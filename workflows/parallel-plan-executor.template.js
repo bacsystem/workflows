@@ -11,7 +11,10 @@ export const meta = {
 
 /* __SCHEDULER_SOURCE__ */
 
+/* __VALIDATION_SOURCE__ */
+
 const { graph, tasks, planPath, repoPath } = args;
+validateWorkflowArgs({ tasks, graph }); // falla rápido y claro, nunca deadlock
 const tasksById = new Map(tasks.map((t) => [t.id, t]));
 
 const FIND_SDD_SCRIPTS =

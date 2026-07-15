@@ -48,7 +48,107 @@ async function runDag(graph, taskFn) {
 }
 
 
+function buildGraph(tasks) {
+  const producedBy = new Map(); // symbol -> taskId
+  for (const task of tasks) {
+    for (const symbol of task.interfaces.produces) {
+      if (!producedBy.has(symbol)) producedBy.set(symbol, task.id);
+    }
+  }
+
+  const deps = new Map(tasks.map((t) => [t.id, new Set()]));
+  const fileOwner = new Map(); // filePath -> first taskId to touch it
+
+  for (const task of tasks) {
+    for (const symbol of task.interfaces.consumes) {
+      const producerId = producedBy.get(symbol);
+      if (producerId !== undefined && producerId !== task.id) {
+        deps.get(task.id).add(producerId);
+      }
+    }
+
+    const touchedFiles = [...task.files.create, ...task.files.modify, ...task.files.test];
+    for (const file of touchedFiles) {
+      const previousOwner = fileOwner.get(file);
+      if (previousOwner !== undefined && previousOwner !== task.id) {
+        deps.get(task.id).add(previousOwner);
+      }
+      fileOwner.set(file, task.id); // el último que lo toca pasa a ser el dueño
+    }
+  }
+
+  const graph = {};
+  for (const [taskId, depSet] of deps) {
+    graph[taskId] = [...depSet].sort((a, b) => a - b);
+  }
+
+  assertAcyclic(graph);
+  return graph;
+}
+
+function assertAcyclic(graph) {
+  const UNVISITED = 0;
+  const VISITING = 1;
+  const DONE = 2;
+  const state = new Map();
+
+  function visit(id, chain) {
+    const current = state.get(id) ?? UNVISITED;
+    if (current === DONE) return;
+    if (current === VISITING) {
+      throw new Error(`Cycle detected in plan dependency graph: ${[...chain, id].join(' -> ')}`);
+    }
+    state.set(id, VISITING);
+    for (const dep of graph[id] ?? []) {
+      visit(dep, [...chain, id]);
+    }
+    state.set(id, DONE);
+  }
+
+  for (const id of Object.keys(graph).map(Number)) {
+    visit(id, []);
+  }
+}
+
+
+// El workflow recibe tasks/graph como JSON pegado a mano por el usuario (ver README);
+// un ciclo en ese grafo deja a runDag esperando su propia promesa memoizada para
+// siempre — deadlock sin error ni log. Esta validación corre antes de lanzar cualquier
+// agente para que el fallo sea inmediato y explicable.
+function validateWorkflowArgs({ tasks, graph }) {
+  if (!Array.isArray(tasks) || tasks.length === 0) {
+    throw new Error('args.tasks must be a non-empty array');
+  }
+  if (!graph || typeof graph !== 'object') {
+    throw new Error('args.graph must be an object');
+  }
+
+  const taskIds = new Set(tasks.map((t) => t.id));
+
+  for (const key of Object.keys(graph)) {
+    const id = Number(key);
+    if (!taskIds.has(id)) {
+      throw new Error(`Graph references task ${id}, which is not present in tasks`);
+    }
+    for (const dep of graph[key]) {
+      if (!taskIds.has(dep)) {
+        throw new Error(`Task ${id} declares dependency ${dep}, which is not present in tasks`);
+      }
+    }
+  }
+
+  for (const id of taskIds) {
+    if (graph[id] === undefined) {
+      throw new Error(`Task ${id} is missing from the graph`);
+    }
+  }
+
+  assertAcyclic(graph); // falla ruidosamente antes de que runDag pueda deadlockear
+}
+
+
 const { graph, tasks, planPath, repoPath } = args;
+validateWorkflowArgs({ tasks, graph }); // falla rápido y claro, nunca deadlock
 const tasksById = new Map(tasks.map((t) => [t.id, t]));
 
 const FIND_SDD_SCRIPTS =

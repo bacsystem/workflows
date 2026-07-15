@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { parsePlan } from '../src/plan-parser.js';
-import { buildGraph } from '../src/graph-builder.js';
+import { buildGraph, assertAcyclic } from '../src/graph-builder.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -45,6 +45,14 @@ test('throws on a cyclic dependency', () => {
     { id: 2, title: 'B', files: { create: [], modify: [], test: [] }, interfaces: { consumes: ['a'], produces: ['b'] } },
   ];
   assert.throws(() => buildGraph(tasks), /Cycle detected/);
+});
+
+test('assertAcyclic detecta un ciclo en un grafo ya construido', () => {
+  assert.throws(() => assertAcyclic({ 1: [2], 2: [1] }), /Cycle detected/);
+});
+
+test('assertAcyclic acepta un DAG válido', () => {
+  assert.doesNotThrow(() => assertAcyclic({ 1: [], 2: [1], 3: [1, 2] }));
 });
 
 test('builds a real graph from a business-core plan excerpt', () => {

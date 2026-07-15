@@ -36,7 +36,7 @@ export function buildGraph(tasks) {
   return graph;
 }
 
-function assertAcyclic(graph) {
+export function assertAcyclic(graph) {
   const UNVISITED = 0;
   const VISITING = 1;
   const DONE = 2;
