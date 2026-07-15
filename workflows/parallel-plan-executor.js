@@ -156,12 +156,18 @@ function assertAcyclic(graph) {
 // un ciclo en ese grafo deja a runDag esperando su propia promesa memoizada para
 // siempre — deadlock sin error ni log. Esta validación corre antes de lanzar cualquier
 // agente para que el fallo sea inmediato y explicable.
-function validateWorkflowArgs({ tasks, graph }) {
+function validateWorkflowArgs({ tasks, graph, integrationBranch }) {
   if (!Array.isArray(tasks) || tasks.length === 0) {
     throw new Error('args.tasks must be a non-empty array');
   }
   if (!graph || typeof graph !== 'object') {
     throw new Error('args.graph must be an object');
+  }
+  if (typeof integrationBranch !== 'string' || integrationBranch.trim() === '') {
+    // Sin rama explícita, cada agente de merge (y el review final) "adivina" cuál es la
+    // rama de integración — en un repo con master y develop pueden elegir distinto y
+    // ambos reportar MERGED. Mejor exigirla de entrada.
+    throw new Error('args.integrationBranch must name the branch merges target (e.g. "develop")');
   }
 
   assertUniqueTaskIds(tasks);
@@ -218,8 +224,8 @@ function formatDuration(startedAt, finishedAt) {
 }
 
 
-const { graph, tasks, planPath, repoPath } = args;
-validateWorkflowArgs({ tasks, graph }); // falla rápido y claro, nunca deadlock
+const { graph, tasks, planPath, repoPath, integrationBranch } = args;
+validateWorkflowArgs({ tasks, graph, integrationBranch }); // falla rápido y claro, nunca deadlock
 const tasksById = new Map(tasks.map((t) => [t.id, t]));
 
 const FIND_SDD_SCRIPTS =
@@ -422,7 +428,7 @@ async function executeTask(taskId) {
     taskId,
     await enqueueMainRepo(() =>
       agent(
-        `Merge branch task-${taskId} into the integration branch of repo ${repoPath}. Report ` +
+        `Merge branch task-${taskId} into branch ${integrationBranch} of repo ${repoPath}. Report ` +
         `mergeStatus MERGED on success. If there is a real merge conflict, do not resolve it ` +
         `automatically — stop and report mergeStatus CONFLICT with the conflict details in "detail".`,
         { label: `merge-${taskId}`, phase: 'Merge', schema: MERGE_SCHEMA }
@@ -457,7 +463,7 @@ const mergedCount = [...results.values()].filter((r) => r.status === 'done').len
 let finalReview = null;
 if (mergedCount > 0) {
   finalReview = await agent(
-    `Do a broad whole-branch review of repo ${repoPath}'s integration branch against the ` +
+    `Do a broad whole-branch review of repo ${repoPath}'s \`${integrationBranch}\` branch against the ` +
     `full plan at ${planPath} (use superpowers:requesting-code-review's code-reviewer ` +
     `template). Check cross-task consistency the per-task reviews couldn't see.`,
     { label: 'final-review', phase: 'Final review', effort: 'high' }

@@ -39,7 +39,8 @@ node bin/parse-plan.js /path/to/your-plan.md > /tmp/plan-graph.json
 #    args: { tasks: <the "tasks" field of plan-graph.json>,
 #            graph: <the "graph" field of plan-graph.json>,
 #            planPath: "/path/to/your-plan.md",
-#            repoPath: "/path/to/your/project" }
+#            repoPath: "/path/to/your/project",
+#            integrationBranch: "develop" }  # the branch every task merges into (required)
 ```
 
 ## Safety checks (v0.2)

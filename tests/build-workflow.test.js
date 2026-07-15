@@ -26,9 +26,30 @@ test('build script embeds the args validation and the template invokes it before
   assert.ok(output.includes('function assertAcyclic('));
   assert.ok(!output.includes('__VALIDATION_SOURCE__'));
   assert.ok(!output.includes('import '), 'the built file must be self-contained, no imports');
+  const validateIndex = output.indexOf('validateWorkflowArgs({ tasks, graph, integrationBranch })');
+  assert.ok(validateIndex >= 0, 'the template must invoke validateWorkflowArgs with integrationBranch');
   assert.ok(
-    output.indexOf('validateWorkflowArgs({ tasks, graph })') < output.indexOf('agent('),
+    validateIndex < output.indexOf('agent('),
     'validation must run before any agent() call'
+  );
+});
+
+test('built workflow names the integration branch explicitly instead of letting agents guess', () => {
+  assert.ok(
+    output.includes('integrationBranch } = args'),
+    'integrationBranch debe venir de args'
+  );
+  assert.ok(
+    output.includes('into branch ${integrationBranch}'),
+    'el prompt de merge debe nombrar la rama destino'
+  );
+  assert.ok(
+    output.includes('\\`${integrationBranch}\\` branch'),
+    'el review final debe revisar esa misma rama, no adivinar otra'
+  );
+  assert.ok(
+    !output.includes('the integration branch of repo'),
+    'no debe quedar ninguna referencia a una rama de integración sin nombre'
   );
 });
 
