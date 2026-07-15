@@ -1,0 +1,55 @@
+flowchart TD
+    subgraph PREP["1 · Preparación (local, Node puro)"]
+        A["Plan writing-plans<br/>(cada tarea declara Consumes / Produces)"]
+        B["bin/parse-plan.js"]
+        C["plan-parser.js<br/>parsea bloques de tareas<br/>(normaliza CRLF)"]
+        D["graph-builder.js<br/>infiere dependencias:<br/>Produces→Consumes + archivos en común"]
+        E["JSON: tasks + graph"]
+        F["Invocar Workflow con args:<br/>tasks, graph, planPath, repoPath"]
+        A --> B --> C --> D --> E --> F
+    end
+
+    F --> DAG
+
+    subgraph EXEC["2 · Ejecución (runDag: cada tarea arranca al cerrar SUS dependencias)"]
+        DAG{"¿Dependencias<br/>de la tarea<br/>completas?"}
+        DAG -- "sí" --> IMPL
+        DAG -- "alguna falló" --> SKIP["SKIP en cascada<br/>(dependientes transitivos<br/>no se ejecutan)"]
+
+        IMPL["IMPLEMENT<br/>agente en git worktree propio<br/>rama task-&lt;id&gt;, lee solo su brief,<br/>TDD, self-review, reporte"]
+        IMPL --> BLK{"¿BLOCKED /<br/>NEEDS_CONTEXT?"}
+        BLK -- "sí" --> FAIL["Tarea FALLA<br/>(se anota en ledger)"]
+        BLK -- "no" --> REV
+
+        REV["REVIEW adversarial<br/>spec: PASS/FAIL<br/>calidad: APPROVED/NEEDS_FIXES"]
+        REV --> OK1{"¿PASS +<br/>APPROVED?"}
+        OK1 -- "sí" --> MERGE
+        OK1 -- "no" --> FIX["FIX (una sola ronda)<br/>corrige en la misma rama"]
+        FIX --> REV2["RE-REVIEW"]
+        REV2 --> OK2{"¿PASS +<br/>APPROVED?"}
+        OK2 -- "sí" --> MERGE
+        OK2 -- "no" --> FAIL
+
+        MERGE["MERGE serializado<br/>(cola de a uno, orden del DAG)<br/>a la rama de integración"]
+        MERGE --> CONF{"¿Conflicto<br/>real?"}
+        CONF -- "sí: CONFLICT" --> FAIL
+        CONF -- "no: MERGED" --> DONE["Tarea DONE<br/>ledger + progress bar"]
+
+        FAIL --> SKIP
+    end
+
+    DONE --> ALLQ
+    SKIP --> ALLQ
+
+    subgraph FIN["3 · Cierre"]
+        ALLQ{"¿Todas las tareas<br/>settled?"}
+        ALLQ -- "sí, y ≥1 mergeada" --> FR["FINAL REVIEW<br/>rama completa vs plan completo<br/>(consistencia entre tareas)"]
+        ALLQ -- "sí, ninguna mergeada" --> REP
+        FR --> REP["Reporte final:<br/>done / FAILED / skipped por tarea"]
+        REP --> HAND["NO abre PR<br/>handoff manual al skill git-flow"]
+    end
+
+    style FAIL fill:#8b1a1a,color:#fff
+    style SKIP fill:#8a6d1a,color:#fff
+    style DONE fill:#1a6b2a,color:#fff
+    style FR fill:#1a4a8b,color:#fff

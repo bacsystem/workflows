@@ -22,11 +22,16 @@ async function runDag(graph, taskFn) {
       const blockedIndex = depOutcomes.findIndex((outcome) => outcome.status === 'rejected');
       if (blockedIndex !== -1) {
         const blockedBy = deps[blockedIndex];
-        results.set(taskId, {
-          status: 'skipped',
-          reason: `blocked by a failed dependency (task ${blockedBy})`,
-        });
-        throw new Error(`task ${taskId} skipped: blocked by dependency ${blockedBy}`);
+        // El bloqueador pudo haber fallado él mismo o haber sido skipped por su propia
+        // dependencia; el motivo distingue ambos casos y propaga la causa raíz original,
+        // no el eslabón intermedio de la cascada.
+        const blocker = results.get(blockedBy);
+        const rootCauseId = blocker?.status === 'skipped' ? blocker.rootCauseId : blockedBy;
+        const reason = blocker?.status === 'skipped'
+          ? `blocked by a skipped dependency (task ${blockedBy}); root cause: task ${rootCauseId} failed`
+          : `blocked by a failed dependency (task ${blockedBy})`;
+        results.set(taskId, { status: 'skipped', reason, rootCauseId });
+        throw new Error(`task ${taskId} skipped: ${reason}`);
       }
 
       try {
@@ -48,7 +53,128 @@ async function runDag(graph, taskFn) {
 }
 
 
+function buildGraphWithDiagnostics(tasks) {
+  const warnings = [];
+  const producersOf = new Map(); // symbol -> [taskIds en orden de aparición]
+  for (const task of tasks) {
+    for (const symbol of task.interfaces.produces) {
+      if (!producersOf.has(symbol)) producersOf.set(symbol, []);
+      const producers = producersOf.get(symbol);
+      if (!producers.includes(task.id)) producers.push(task.id);
+    }
+  }
+
+  const producedBy = new Map(); // symbol -> taskId (el primer productor gana)
+  for (const [symbol, producers] of producersOf) {
+    producedBy.set(symbol, producers[0]);
+    if (producers.length > 1) {
+      // Ambigüedad real del plan (dos tareas dicen crear lo mismo): es warning, no
+      // error — no impide ejecutar, pero el usuario debe enterarse en vez de que se
+      // resuelva en silencio por orden de aparición.
+      warnings.push(
+        `Symbol ${symbol} is declared as produced by tasks ${producers.join(', ')} — ` +
+        `first producer wins (task ${producers[0]})`
+      );
+    }
+  }
+
+  const deps = new Map(tasks.map((t) => [t.id, new Set()]));
+  const fileOwner = new Map(); // filePath -> first taskId to touch it
+
+  for (const task of tasks) {
+    for (const symbol of task.interfaces.consumes) {
+      const producerId = producedBy.get(symbol);
+      if (producerId !== undefined && producerId !== task.id) {
+        deps.get(task.id).add(producerId);
+      }
+    }
+
+    const touchedFiles = [...task.files.create, ...task.files.modify, ...task.files.test];
+    for (const file of touchedFiles) {
+      const previousOwner = fileOwner.get(file);
+      if (previousOwner !== undefined && previousOwner !== task.id) {
+        deps.get(task.id).add(previousOwner);
+      }
+      fileOwner.set(file, task.id); // el último que lo toca pasa a ser el dueño
+    }
+  }
+
+  const graph = {};
+  for (const [taskId, depSet] of deps) {
+    graph[taskId] = [...depSet].sort((a, b) => a - b);
+  }
+
+  assertAcyclic(graph);
+  return { graph, warnings };
+}
+
+function buildGraph(tasks) {
+  return buildGraphWithDiagnostics(tasks).graph;
+}
+
+function assertAcyclic(graph) {
+  const UNVISITED = 0;
+  const VISITING = 1;
+  const DONE = 2;
+  const state = new Map();
+
+  function visit(id, chain) {
+    const current = state.get(id) ?? UNVISITED;
+    if (current === DONE) return;
+    if (current === VISITING) {
+      throw new Error(`Cycle detected in plan dependency graph: ${[...chain, id].join(' -> ')}`);
+    }
+    state.set(id, VISITING);
+    for (const dep of graph[id] ?? []) {
+      visit(dep, [...chain, id]);
+    }
+    state.set(id, DONE);
+  }
+
+  for (const id of Object.keys(graph).map(Number)) {
+    visit(id, []);
+  }
+}
+
+
+// El workflow recibe tasks/graph como JSON pegado a mano por el usuario (ver README);
+// un ciclo en ese grafo deja a runDag esperando su propia promesa memoizada para
+// siempre — deadlock sin error ni log. Esta validación corre antes de lanzar cualquier
+// agente para que el fallo sea inmediato y explicable.
+function validateWorkflowArgs({ tasks, graph }) {
+  if (!Array.isArray(tasks) || tasks.length === 0) {
+    throw new Error('args.tasks must be a non-empty array');
+  }
+  if (!graph || typeof graph !== 'object') {
+    throw new Error('args.graph must be an object');
+  }
+
+  const taskIds = new Set(tasks.map((t) => t.id));
+
+  for (const key of Object.keys(graph)) {
+    const id = Number(key);
+    if (!taskIds.has(id)) {
+      throw new Error(`Graph references task ${id}, which is not present in tasks`);
+    }
+    for (const dep of graph[key]) {
+      if (!taskIds.has(dep)) {
+        throw new Error(`Task ${id} declares dependency ${dep}, which is not present in tasks`);
+      }
+    }
+  }
+
+  for (const id of taskIds) {
+    if (graph[id] === undefined) {
+      throw new Error(`Task ${id} is missing from the graph`);
+    }
+  }
+
+  assertAcyclic(graph); // falla ruidosamente antes de que runDag pueda deadlockear
+}
+
+
 const { graph, tasks, planPath, repoPath } = args;
+validateWorkflowArgs({ tasks, graph }); // falla rápido y claro, nunca deadlock
 const tasksById = new Map(tasks.map((t) => [t.id, t]));
 
 const FIND_SDD_SCRIPTS =
@@ -122,6 +248,17 @@ function enqueueMerge(fn) {
   return next;
 }
 
+// Los agentes de fix hacen checkout de su rama task-<id> en el repo principal (no en un
+// worktree propio), y un repo git solo puede tener una rama checked out a la vez — dos
+// reviews fallidas concurrentes se pisarían el working tree. Misma solución que los
+// merges: una cola que los serializa.
+let fixQueueTail = Promise.resolve();
+function enqueueFix(fn) {
+  const next = fixQueueTail.then(fn, fn);
+  fixQueueTail = next.catch(() => {});
+  return next;
+}
+
 // Textual progress bar, emitted via log() after every task settles so the user
 // sees advancement in the narrator lines without opening /workflows.
 let settledCount = 0;
@@ -129,6 +266,13 @@ function progressBar() {
   const total = tasks.length;
   const filled = Math.round((settledCount / total) * 20);
   return `[${'#'.repeat(filled)}${'-'.repeat(20 - filled)}] ${settledCount}/${total} tasks settled`;
+}
+
+// Único punto de incremento: toda rama terminal de runTask pasa por acá, para que la
+// barra no vuelva a desincronizarse cuando se agregue una rama nueva.
+function settle(taskId, label) {
+  settledCount += 1;
+  log(`${progressBar()} — Task ${taskId} ${label}`);
 }
 
 async function implement(task) {
@@ -190,25 +334,24 @@ async function runTask(taskId) {
   try {
     impl = await implement(task);
   } catch (error) {
-    settledCount += 1;
-    log(`${progressBar()} — Task ${taskId} FAILED`);
+    settle(taskId, 'FAILED');
     throw error;
   }
 
   if (impl.status === 'BLOCKED' || impl.status === 'NEEDS_CONTEXT') {
     await appendLedger(`Task ${taskId}: ${impl.status} — ${impl.concerns ?? 'no detail given'}`);
-    settledCount += 1;
-    log(`${progressBar()} — Task ${taskId} ${impl.status}`);
+    settle(taskId, impl.status);
     throw new Error(`Task ${taskId} ${impl.status}: ${impl.concerns ?? 'no detail given'}`);
   }
 
   let verdict = await review(task, impl);
   if (verdict.qualityVerdict === 'NEEDS_FIXES' || verdict.specVerdict === 'FAIL') {
     log(`Task ${taskId}: review found issues, fixing once`);
-    impl = await fix(task, impl, verdict.findings);
+    impl = await enqueueFix(() => fix(task, impl, verdict.findings));
     verdict = await review(task, impl);
     if (verdict.qualityVerdict === 'NEEDS_FIXES' || verdict.specVerdict === 'FAIL') {
       await appendLedger(`Task ${taskId}: blocked — review still failing after one fix round`);
+      settle(taskId, 'FAILED (review)');
       throw new Error(`Task ${taskId}: review still failing after one fix round: ${verdict.findings}`);
     }
   }
@@ -224,8 +367,7 @@ async function runTask(taskId) {
 
   if (mergeResult.mergeStatus === 'CONFLICT') {
     await appendLedger(`Task ${taskId}: merge CONFLICT — ${mergeResult.detail ?? 'no detail given'}`);
-    settledCount += 1;
-    log(`${progressBar()} — Task ${taskId} FAILED (merge conflict)`);
+    settle(taskId, 'FAILED (merge conflict)');
     throw new Error(`Task ${taskId} merge CONFLICT: ${mergeResult.detail ?? 'no detail given'}`);
   }
 
@@ -234,12 +376,15 @@ async function runTask(taskId) {
     `(${formatDuration(impl.startedAt, impl.finishedAt)}, commits ` +
     `${impl.baseSha.slice(0, 7)}..${impl.headSha.slice(0, 7)}, review clean)`
   );
-  settledCount += 1;
-  log(`${progressBar()} — Task ${taskId} done in ${formatDuration(impl.startedAt, impl.finishedAt)}`);
+  settle(taskId, `done in ${formatDuration(impl.startedAt, impl.finishedAt)}`);
   return impl;
 }
 
 const results = await runDag(graph, runTask);
+
+// Las tareas skipped nunca pasan por runTask; reconciliar para que la barra cierre en N/N.
+settledCount = results.size;
+log(`${progressBar()} — ejecución terminada`);
 
 const mergedCount = [...results.values()].filter((r) => r.status === 'done').length;
 let finalReview = null;

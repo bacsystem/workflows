@@ -70,3 +70,18 @@ test('cascades skip status transitively through a chain of dependents', async ()
   assert.ok(!called.includes(2));
   assert.ok(!called.includes(3));
 });
+
+test('el motivo del skip distingue failed de skipped y apunta a la causa raíz', async () => {
+  const graph = { 1: [], 2: [1], 3: [2] };
+
+  const results = await runDag(graph, async (id) => {
+    if (id === 1) throw new Error('boom');
+    return id;
+  });
+
+  // dependencia directa: la 1 realmente falló
+  assert.match(results.get(2).reason, /failed dependency \(task 1\)/);
+  // dependencia transitiva: la 2 fue skipped, no failed — y la causa raíz es la 1
+  assert.match(results.get(3).reason, /skipped dependency \(task 2\)/);
+  assert.match(results.get(3).reason, /root cause: task 1 failed/);
+});

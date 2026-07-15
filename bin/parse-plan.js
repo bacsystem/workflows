@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
 import { parsePlan } from '../src/plan-parser.js';
-import { buildGraph } from '../src/graph-builder.js';
+import { buildGraphWithDiagnostics } from '../src/graph-builder.js';
 
 const [, , planPath] = process.argv;
 if (!planPath) {
@@ -11,6 +11,11 @@ if (!planPath) {
 
 const planText = readFileSync(planPath, 'utf8');
 const tasks = parsePlan(planText);
-const graph = buildGraph(tasks);
+const { graph, warnings } = buildGraphWithDiagnostics(tasks);
 
-console.log(JSON.stringify({ tasks, graph }, null, 2));
+// Warnings a stderr: stdout es el JSON que se pipea y debe quedar limpio.
+for (const warning of warnings) {
+  console.error(`WARNING: ${warning}`);
+}
+
+console.log(JSON.stringify({ tasks, graph, warnings }, null, 2));

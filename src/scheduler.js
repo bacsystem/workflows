@@ -11,11 +11,16 @@ export async function runDag(graph, taskFn) {
       const blockedIndex = depOutcomes.findIndex((outcome) => outcome.status === 'rejected');
       if (blockedIndex !== -1) {
         const blockedBy = deps[blockedIndex];
-        results.set(taskId, {
-          status: 'skipped',
-          reason: `blocked by a failed dependency (task ${blockedBy})`,
-        });
-        throw new Error(`task ${taskId} skipped: blocked by dependency ${blockedBy}`);
+        // El bloqueador pudo haber fallado él mismo o haber sido skipped por su propia
+        // dependencia; el motivo distingue ambos casos y propaga la causa raíz original,
+        // no el eslabón intermedio de la cascada.
+        const blocker = results.get(blockedBy);
+        const rootCauseId = blocker?.status === 'skipped' ? blocker.rootCauseId : blockedBy;
+        const reason = blocker?.status === 'skipped'
+          ? `blocked by a skipped dependency (task ${blockedBy}); root cause: task ${rootCauseId} failed`
+          : `blocked by a failed dependency (task ${blockedBy})`;
+        results.set(taskId, { status: 'skipped', reason, rootCauseId });
+        throw new Error(`task ${taskId} skipped: ${reason}`);
       }
 
       try {

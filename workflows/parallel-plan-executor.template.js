@@ -11,7 +11,10 @@ export const meta = {
 
 /* __SCHEDULER_SOURCE__ */
 
+/* __VALIDATION_SOURCE__ */
+
 const { graph, tasks, planPath, repoPath } = args;
+validateWorkflowArgs({ tasks, graph }); // falla rápido y claro, nunca deadlock
 const tasksById = new Map(tasks.map((t) => [t.id, t]));
 
 const FIND_SDD_SCRIPTS =
@@ -85,6 +88,17 @@ function enqueueMerge(fn) {
   return next;
 }
 
+// Los agentes de fix hacen checkout de su rama task-<id> en el repo principal (no en un
+// worktree propio), y un repo git solo puede tener una rama checked out a la vez — dos
+// reviews fallidas concurrentes se pisarían el working tree. Misma solución que los
+// merges: una cola que los serializa.
+let fixQueueTail = Promise.resolve();
+function enqueueFix(fn) {
+  const next = fixQueueTail.then(fn, fn);
+  fixQueueTail = next.catch(() => {});
+  return next;
+}
+
 // Textual progress bar, emitted via log() after every task settles so the user
 // sees advancement in the narrator lines without opening /workflows.
 let settledCount = 0;
@@ -92,6 +106,13 @@ function progressBar() {
   const total = tasks.length;
   const filled = Math.round((settledCount / total) * 20);
   return `[${'#'.repeat(filled)}${'-'.repeat(20 - filled)}] ${settledCount}/${total} tasks settled`;
+}
+
+// Único punto de incremento: toda rama terminal de runTask pasa por acá, para que la
+// barra no vuelva a desincronizarse cuando se agregue una rama nueva.
+function settle(taskId, label) {
+  settledCount += 1;
+  log(`${progressBar()} — Task ${taskId} ${label}`);
 }
 
 async function implement(task) {
@@ -153,25 +174,24 @@ async function runTask(taskId) {
   try {
     impl = await implement(task);
   } catch (error) {
-    settledCount += 1;
-    log(`${progressBar()} — Task ${taskId} FAILED`);
+    settle(taskId, 'FAILED');
     throw error;
   }
 
   if (impl.status === 'BLOCKED' || impl.status === 'NEEDS_CONTEXT') {
     await appendLedger(`Task ${taskId}: ${impl.status} — ${impl.concerns ?? 'no detail given'}`);
-    settledCount += 1;
-    log(`${progressBar()} — Task ${taskId} ${impl.status}`);
+    settle(taskId, impl.status);
     throw new Error(`Task ${taskId} ${impl.status}: ${impl.concerns ?? 'no detail given'}`);
   }
 
   let verdict = await review(task, impl);
   if (verdict.qualityVerdict === 'NEEDS_FIXES' || verdict.specVerdict === 'FAIL') {
     log(`Task ${taskId}: review found issues, fixing once`);
-    impl = await fix(task, impl, verdict.findings);
+    impl = await enqueueFix(() => fix(task, impl, verdict.findings));
     verdict = await review(task, impl);
     if (verdict.qualityVerdict === 'NEEDS_FIXES' || verdict.specVerdict === 'FAIL') {
       await appendLedger(`Task ${taskId}: blocked — review still failing after one fix round`);
+      settle(taskId, 'FAILED (review)');
       throw new Error(`Task ${taskId}: review still failing after one fix round: ${verdict.findings}`);
     }
   }
@@ -187,8 +207,7 @@ async function runTask(taskId) {
 
   if (mergeResult.mergeStatus === 'CONFLICT') {
     await appendLedger(`Task ${taskId}: merge CONFLICT — ${mergeResult.detail ?? 'no detail given'}`);
-    settledCount += 1;
-    log(`${progressBar()} — Task ${taskId} FAILED (merge conflict)`);
+    settle(taskId, 'FAILED (merge conflict)');
     throw new Error(`Task ${taskId} merge CONFLICT: ${mergeResult.detail ?? 'no detail given'}`);
   }
 
@@ -197,12 +216,15 @@ async function runTask(taskId) {
     `(${formatDuration(impl.startedAt, impl.finishedAt)}, commits ` +
     `${impl.baseSha.slice(0, 7)}..${impl.headSha.slice(0, 7)}, review clean)`
   );
-  settledCount += 1;
-  log(`${progressBar()} — Task ${taskId} done in ${formatDuration(impl.startedAt, impl.finishedAt)}`);
+  settle(taskId, `done in ${formatDuration(impl.startedAt, impl.finishedAt)}`);
   return impl;
 }
 
 const results = await runDag(graph, runTask);
+
+// Las tareas skipped nunca pasan por runTask; reconciliar para que la barra cierre en N/N.
+settledCount = results.size;
+log(`${progressBar()} — ejecución terminada`);
 
 const mergedCount = [...results.values()].filter((r) => r.status === 'done').length;
 let finalReview = null;
