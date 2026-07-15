@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-07-15
+
+### Fixed
+
+- `npm run build` (and the build tests) failed on Windows working copies checked out with
+  `core.autocrlf=true`: the import/export-stripping regexes were anchored to `\n` and did
+  not match CRLF line endings, leaving `import` lines in the built artifact. The inlining
+  transform now lives in `scripts/inline-source.js`, normalizes CRLF to LF first (same
+  family as the 0.1.0 plan-parser CRLF fix), and is covered by unit tests with both
+  line endings.
+
 ## [0.2.0] - 2026-07-14
 
 ### Added
