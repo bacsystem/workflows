@@ -57,6 +57,11 @@ node bin/parse-plan.js /path/to/your-plan.md > /tmp/plan-graph.json
 
 ## Known limitations (v1)
 
+- Only backtick-quoted symbols count in `Consumes`/`Produces` (e.g.
+  `` - Produces: the `createWidget()` factory `` produces `createWidget`). Bare prose is
+  ignored on purpose: extracting every identifier turned words like "the" or "None" into
+  symbols and created spurious dependencies — even false cycles — between unrelated tasks.
+  `Consumes: None` is therefore simply an empty list.
 - The `Consumes`/`Produces` parser reads one line at a time — a value that wraps onto a
   second line in the plan's prose won't be captured. A missed dependency does **not**
   silently misorder tasks: the task starts without its real dependency in place, so it

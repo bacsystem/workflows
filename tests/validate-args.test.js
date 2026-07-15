@@ -34,6 +34,12 @@ test('rechaza una tarea que falta en el grafo', () => {
     /task 2 is missing from the graph/i);
 });
 
+test('rechaza ids de tarea duplicados en vez de perder una tarea en silencio', () => {
+  const tasks = [{ id: 1, title: 'A' }, { id: 1, title: 'B' }];
+  assert.throws(() => validateWorkflowArgs({ tasks, graph: { 1: [] } }),
+    /duplicate task id 1/i);
+});
+
 test('rechaza un grafo cíclico', () => {
   const tasks = [{ id: 1, title: 'A' }, { id: 2, title: 'B' }];
   assert.throws(() => validateWorkflowArgs({ tasks, graph: { 1: [2], 2: [1] } }),

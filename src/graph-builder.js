@@ -24,7 +24,7 @@ export function buildGraphWithDiagnostics(tasks) {
   }
 
   const deps = new Map(tasks.map((t) => [t.id, new Set()]));
-  const fileOwner = new Map(); // filePath -> first taskId to touch it
+  const fileOwner = new Map(); // filePath -> ÚLTIMO taskId que lo tocó (encadena la serialización)
 
   for (const task of tasks) {
     for (const symbol of task.interfaces.consumes) {

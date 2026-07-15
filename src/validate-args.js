@@ -12,7 +12,15 @@ export function validateWorkflowArgs({ tasks, graph }) {
     throw new Error('args.graph must be an object');
   }
 
-  const taskIds = new Set(tasks.map((t) => t.id));
+  const taskIds = new Set();
+  for (const task of tasks) {
+    if (taskIds.has(task.id)) {
+      // Dos tareas con el mismo id colapsan en una sola entrada de tasksById y una de
+      // ellas nunca se ejecutaría, sin que nadie lo reporte.
+      throw new Error(`Duplicate task id ${task.id} in tasks`);
+    }
+    taskIds.add(task.id);
+  }
 
   for (const key of Object.keys(graph)) {
     const id = Number(key);

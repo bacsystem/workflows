@@ -21,8 +21,8 @@ A Claude Code `Workflow` script that executes a `superpowers:writing-plans` impl
 The project is split in two halves because the Workflow sandbox has no filesystem access and forbids `Date.now()`/`new Date()`:
 
 1. **Local, pure-Node preparation** (`src/`, `bin/parse-plan.js`) — runs outside the Workflow, fully unit-tested:
-   - `src/plan-parser.js` parses `### Task N:` blocks out of a plan file (normalizes CRLF first; `Consumes`/`Produces` values are matched one line at a time — a value wrapping to a second line is a known limitation, see README).
-   - `src/graph-builder.js` infers dependencies (Produces→Consumes symbol matching, plus first-task-to-touch-a-file owns it) and rejects cycles.
+   - `src/plan-parser.js` parses `### Task N:` blocks out of a plan file (normalizes CRLF first; only backtick-quoted symbols count in `Consumes`/`Produces`, matched one line at a time — a value wrapping to a second line is a known limitation, see README; duplicate task ids are rejected).
+   - `src/graph-builder.js` infers dependencies (Produces→Consumes symbol matching, plus tasks touching the same file are chained — each depends on the *last* previous toucher) and rejects cycles.
    - `bin/parse-plan.js` ties both together and prints `{ tasks, graph }` as JSON, which the user passes as the Workflow's `args` along with `planPath` and `repoPath`.
 
 2. **Workflow execution** (`workflows/`):
