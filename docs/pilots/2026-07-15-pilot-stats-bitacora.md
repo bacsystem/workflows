@@ -425,3 +425,52 @@ implementada + revisada (PASS/APPROVED) pero **sin mergear** (branch `task-2` vi
 (`git status` limpio, `ls-remote` sin la rama, sin PR abierto). Run pausado con
 `TaskStop`, recuperable con `resumeFromRunId: wf_2901fa01-3df` una vez decidido cómo
 destrabar F8.
+
+## Continuación (mismo día): F8 resultó insuficiente; la solución es una regla de permisos
+
+Con el fix F8 aplicado (v0.5.1: `mergeAuthorization` inyectada textual en cada prompt de
+merge), se retomó el run. Secuencia de lo observado:
+
+1. **El resume re-corrió todo lo cacheado**: al cambiar los prompts (F7/F8), ningún
+   agente previo matcheó su clave de caché — implement/review/merge de tasks 1-2 se
+   re-ejecutaron desde cero. Los agentes detectaron el trabajo ya hecho y solo
+   re-verificaron (honesto pero costoso: ~10 min y ~150k tokens para "no hacer nada").
+   Lección de diseño: un cambio de prompt invalida TODO el caché del run, no solo el
+   agente afectado.
+2. **La re-review de task-2 (reviewer fresco) encontró un bug real** que la review
+   original no vio: `List()` ordenaba IDs como strings (`"10" < "2"`), rompiendo la
+   paginación desde el registro 11. La ronda de fix lo corrigió (orden numérico +
+   RWMutex + test de regresión). La re-review post-fix encontró **otro** bug real
+   (panic con `page<1`/`size<1` por bounds de slice sin clamp) — y con la única ronda de
+   fix agotada, task-2 quedó FAILED por diseño. El orquestador arregló ese segundo bug a
+   mano (commit `93a59f1` en task-2, TDD: RED verificado antes del fix) y relanzó fresco.
+3. **F8 refutado por el clasificador**: en el run fresco, `merge-1` fue bloqueado por el
+   clasificador de permisos del harness (no autobloqueo del agente) con una razón
+   explícita: la frase embebida "el usuario ya autorizó" es una *"self-asserted,
+   unverifiable third-person statement, not genuine consent visible in this
+   transcript"*. Conclusión: **inyectar la autorización en el prompt ayuda contra el
+   autobloqueo del agente (F8 original) pero no vincula al clasificador** — este exige
+   consentimiento verificable en la transcripción donde corre el comando, o una regla de
+   permisos previa. Cascada: 5 tareas skipped por un merge no-op de una task ya mergeada.
+
+### La solución adoptada (validación pendiente en el próximo run)
+
+Regla **`ask`** en `.claude/settings.json` del proyecto destino:
+
+```json
+{ "permissions": { "ask": ["Bash(git merge:*)", "Bash(git -C * merge *)"] } }
+```
+
+Las reglas explícitas tienen precedencia sobre el modo auto: con esto, cada `git merge`
+de agente dispara el diálogo nativo Allow/Deny al usuario (determinístico, sin juicio
+del clasificador), y "Allow always" deja pasar el resto del run. Instalada por el
+usuario (un intento del orquestador de instalarla vía update-config fue bloqueado como
+auto-modificación; la escritura directa del archivo con el pedido explícito del usuario
+en sus palabras sí pasó). Documentado en README/README.es como setup de una sola vez.
+
+### Hallazgo de diseño pendiente (F9, propuesto)
+
+El workflow intenta mergear task-1 en cada corrida aunque ya esté mergeada (no-op que
+igual se expone al clasificador y puede tumbar toda la corrida). Fix propuesto: chequeo
+de solo-lectura `git merge-base --is-ancestor task-N <integrationBranch>` antes de
+lanzar el agente de merge; si ya es ancestro, reportar MERGED sin lanzar agente.
