@@ -271,3 +271,95 @@ observada de verdad).
 La **ronda de fix** (review reprueba → fix agent → re-review): en 5 pilotos, ninguna
 review reprobó a la primera. Queda como pendiente conocido; el camino está cubierto por
 los tests del build y su lógica es la misma cadena implement→review ya validada.
+
+---
+
+# Piloto 6 — pilot-spring (mismo día, v0.4.3): medición de tiempos en JVM
+
+Primer run **no-Node** del workflow (claim "technology-agnostic"): endpoint REST de
+factorial en Spring Boot 3.3 / Java 17 / Maven 3.9.16, con el **mismo DAG** que los
+pilotos 1-2 (`1:[], 2:[], 3:[1,2]`) para comparar tiempos stack vs stack. Preparación
+clave: dependencias Maven pre-descargadas antes del run (si no, la task 1 pagaba la
+descarga de medio Maven Central y arruinaba la medición). El parser digirió sin ajustes
+los símbolos JVM (`FactorialService.factorial`, `GlobalExceptionHandler`).
+
+## Tiempos medidos (ledger + journal; incluyen el ciclo TDD completo del implement)
+
+| Tarea | Duración | Equivalente Node (piloto 2) |
+|---|---|---|
+| 1 — `FactorialService` (JUnit puro) | **3m24s** | 2m34s |
+| 2 — `ErrorResponse` + advice (JUnit puro) | **3m21s** | 2m43s |
+| Par 1∥2 (reloj real: 17:00:11 → 17:03:36) | **3m25s** | 2m46s |
+| 3 — Controller + MockMvc (join) | **3m57s** | — |
+
+**Lectura**: el stack JVM cuesta ~25-40% más por tarea (compilación + arranque de
+Maven/Surefire en cada ciclo RED→GREEN vs `node --test`), y el paralelismo lo amortigua
+igual: dos tareas al precio de una (arranques con 4 s de diferencia, cierres con 1 s).
+La task 3 (MockMvc, más pesada) fue la más cara, como era esperable.
+
+## Verificación end-to-end (a mano, post-run)
+
+App levantada con `mvn spring-boot:run` y smoke test de los 4 caminos:
+`/api/v1/factorial/25` → `{"factorial":"15511210043330985984000000","n":25}` (BigInteger
+más allá de `long`, como string ✓); `/5` → 120 ✓; `/-1` → 400 con `ErrorResponse` ✓;
+`/abc` → 400 con mensaje legible ✓. Suite final en `main`: **10/10, BUILD SUCCESS**.
+
+## Notas del run
+
+- F6 siguió su patrón conocido: el primer intento bloqueó los merges ("si" a secas no
+  autoriza); con la frase del usuario nombrando task-1/task-2, esos merges **pasaron
+  dentro del workflow** — primera vez en la campaña. El de task-3 fue bloqueado por
+  lectura hiper-literal de la frase (nombraba 1 y 2) y se completó a mano bajo la
+  intención explícita ("para que la task 3 complete el endpoint"). Lección operativa:
+  la autorización debe nombrar TODAS las ramas del run (task-1 a task-N).
+- El fix v0.4.3 debutó en producción: los `failed` del primer intento llevaron mensaje
+  legible ("merge agent returned no result...") en vez del `{}` de antes.
+- La review final volvió a agregar valor: detectó un assert tautológico (el test del
+  controller asegura el mensaje que él mismo stubeó) y sugirió tipar la respuesta como
+  record — polish real, no ruido.
+- Los agentes usaron las rutas absolutas de JDK/Maven declaradas en Global Constraints
+  sin fricción (no estaban en el PATH de la sesión).
+
+---
+
+# Piloto 7 — pilot-handoff (mismo día, v0.5.0): estreno de la fase Handoff
+
+Dos tareas Node independientes (`parseDuration` ∥ `formatBytes`), topología GitFlow
+(`master ← develop ← feature/format-utils`), handoff en modo **prepare-only** (sin
+`openPr` — los repos piloto no tienen remoto).
+
+## ✅ El objetivo del piloto: la fase Handoff, validada en su primer run real
+
+El agente de handoff entregó `handoff.md` con todo lo diseñado, y mejor de lo esperado:
+
+- **Título de PR** convencional y **body completo** (Summary / Type of change / Main
+  changes por tarea / Version / Checklist).
+- **Bump SemVer con el razonamiento exacto de git-flow**: `feat` dominante, package 0.x,
+  sin BREAKING → **patch → 0.1.1** (aplicó bien la regla 0.x, la que más se equivoca la
+  gente).
+- **Checklist de limpieza con comandos exactos**, incluyendo el matiz `-d` vs `-D` según
+  el momento del borrado de `task-1`.
+- **Honestidad no pedida**: propagó el "Ready to merge? No" de la review final como
+  caveat destacado — "este handoff prepara el PR, pero no mergear hasta que Task 2
+  aterrice". Exactamente el criterio que un humano querría.
+
+## ⛔ F6 escaló a su forma final: bloqueo de agentes arbitrarios y de retries
+
+- Run inicial: `implement-2` bloqueado por el clasificador como "Auto Mode Bypass" —
+  **falso positivo** (agente legítimo del run autorizado; su gemelo `implement-1`,
+  idéntico en forma, pasó). La task 1 completó todo el pipeline — incluido el merge,
+  que pasó dentro del workflow gracias a la autorización nombrada — y la review final
+  detectó el hueco de la task 2 con precisión.
+- Resume: bloqueado también — `implement-2` por ser "retry de una acción bloqueada sin
+  mensaje nuevo del usuario", y hasta `review-1` (ruta cacheada). Doctrina resultante:
+  **cada reintento requiere un mensaje humano fresco que lo autorice**.
+- Decisión: piloto cerrado con la task 2 sin implementar (repo descartable; el objetivo
+  era el handoff y está cumplido). Lección operativa sumada a F6: en modo auto,
+  presupuestar una autorización humana por (re)intento, o reglas de permisos
+  pre-acordadas por el humano.
+
+## Veredicto del piloto 7
+
+**v0.5.0 validada**: la fase Handoff produce exactamente el entregable diseñado y
+propaga la verdad de la review. Pendiente: probar `openPr: true` (push + creación real
+del PR con los 5 campos) contra un repo GitHub real del usuario.
