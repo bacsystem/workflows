@@ -6,6 +6,7 @@ export const meta = {
     { title: 'Review' },
     { title: 'Merge' },
     { title: 'Final review' },
+    { title: 'Handoff' },
   ],
 }
 
@@ -19,8 +20,8 @@ export const meta = {
 // invocado la tool (comprobado en el piloto 2026-07-15): destructurar el string daba
 // tasks undefined y un error que culpaba al campo equivocado.
 const resolvedArgs = typeof args === 'string' ? JSON.parse(args) : args;
-const { graph, tasks, planPath, repoPath, integrationBranch } = resolvedArgs;
-validateWorkflowArgs({ tasks, graph, integrationBranch }); // falla rápido y claro, nunca deadlock
+const { graph, tasks, planPath, repoPath, integrationBranch, openPr, pr } = resolvedArgs;
+validateWorkflowArgs({ tasks, graph, integrationBranch, openPr, pr }); // falla rápido y claro, nunca deadlock
 const tasksById = new Map(tasks.map((t) => [t.id, t]));
 
 const FIND_SDD_SCRIPTS =
@@ -62,6 +63,17 @@ const MERGE_SCHEMA = {
     detail: { type: 'string' },
   },
   required: ['mergeStatus'],
+};
+
+const HANDOFF_SCHEMA = {
+  type: 'object',
+  properties: {
+    handoffFile: { type: 'string' },
+    versionBump: { type: 'string', description: 'proposed SemVer bump per git-flow rules, e.g. "patch -> 1.2.4" or "minor (0.x breaking) -> 0.5.0"' },
+    prUrl: { type: 'string', description: 'URL of the created PR, only when openPr was requested and succeeded' },
+    detail: { type: 'string' },
+  },
+  required: ['handoffFile'],
 };
 
 function appendLedger(line) {
@@ -199,6 +211,38 @@ async function fix(task, impl, findings) {
   );
 }
 
+// Fase Handoff (v0.5.0): prepara el cierre estilo git-flow SIN ejecutarlo — el merge del
+// PR y la promoción de ramas son siempre humanos. Con openPr: true (consentimiento
+// explícito dado al lanzar), además pushea la feature branch y CREA el PR (crear un PR
+// es pedir revisión humana, no saltearla; mergearlo sí está prohibido).
+async function handoff(finalReview) {
+  const prArgs = pr ?? {};
+  const wantPr = openPr === true;
+  return agent(
+    `In repo ${repoPath}, prepare the git-flow handoff for branch ${integrationBranch}.\n\n` +
+    `1. Inspect the run's work: \`git log --oneline ${integrationBranch}\` — the task-N merge ` +
+    `commits and the commits they brought in. Derive the dominant Conventional ` +
+    `Commit type and propose a SemVer bump per git-flow rules (>=1.0: feat=minor, fix=patch, ` +
+    `BREAKING=major; 0.x: BREAKING=minor, everything else=patch). Report it as versionBump.\n\n` +
+    `2. Write ${repoPath}/.superpowers/sdd/handoff.md containing: a suggested PR title ` +
+    `(Conventional Commit subject covering the run), a PR body with Summary / Type of change / ` +
+    `Main changes (one bullet per task) / Version / Checklist sections, the final review ` +
+    `verdict quoted below, and a post-run cleanup checklist (merged task-N branches to delete, ` +
+    `what to do with ${integrationBranch} after the PR merges). Report its path as handoffFile.\n\n` +
+    (wantPr
+      ? `3. Push ${integrationBranch} to the remote and create the pull request: ` +
+        `\`gh pr create --base ${prArgs.base ?? 'develop'} --head ${integrationBranch}\` with the ` +
+        `title and body from handoff.md, applying these fields when present: ` +
+        `${JSON.stringify(prArgs)} (assignees, labels, milestone; put "Closes #<closes>" in the ` +
+        `body when closes is set). Do NOT merge the PR — that gate is human. Report its URL as ` +
+        `prUrl. If there is no remote or gh fails, do not retry destructively: explain in "detail".\n\n`
+      : `3. Do NOT push and do NOT create any PR (openPr was not requested). Note in "detail" ` +
+        `that the branch is ready for a manual git-flow handoff.\n\n`) +
+    `Final whole-branch review verdict:\n<review>${finalReview ?? 'final review was not run'}</review>`,
+    { label: 'handoff', phase: 'Handoff', schema: HANDOFF_SCHEMA }
+  );
+}
+
 async function runTask(taskId) {
   try {
     return await executeTask(taskId);
@@ -273,6 +317,7 @@ log(`${progressBar()} — ejecución terminada`);
 
 const mergedCount = [...results.values()].filter((r) => r.status === 'done').length;
 let finalReview = null;
+let handoffResult = null;
 if (mergedCount > 0) {
   finalReview = await agent(
     `Do a broad whole-branch review of repo ${repoPath}'s \`${integrationBranch}\` branch against the ` +
@@ -280,6 +325,14 @@ if (mergedCount > 0) {
     `template). Check cross-task consistency the per-task reviews couldn't see.`,
     { label: 'final-review', phase: 'Final review', effort: 'high' }
   );
+  handoffResult = await handoff(finalReview);
+  if (handoffResult) {
+    log(`Handoff listo: ${handoffResult.handoffFile}` +
+      (handoffResult.versionBump ? ` — bump propuesto: ${handoffResult.versionBump}` : '') +
+      (handoffResult.prUrl ? ` — PR: ${handoffResult.prUrl}` : ''));
+  } else {
+    log('Handoff: el agente no devolvió resultado (salteado o error terminal); la rama queda lista para handoff manual');
+  }
 }
 
 const summaryLines = [...results.entries()].map(([id, r]) => {
@@ -303,4 +356,4 @@ const serializableResults = Object.fromEntries(
       : r,
   ])
 );
-return { results: serializableResults, finalReview };
+return { results: serializableResults, finalReview, handoff: handoffResult };

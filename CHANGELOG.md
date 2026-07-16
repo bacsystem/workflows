@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-07-15
+
+### Added
+
+- **Handoff phase**: when at least one task merged, a final agent prepares the git-flow
+  closing — `.superpowers/sdd/handoff.md` with a suggested PR title, full PR body
+  (Summary/Type/Main changes/Version/Checklist), the SemVer bump proposed from the run's
+  Conventional Commits (git-flow rules incl. `0.x`), the final review verdict, and a
+  post-run cleanup checklist. Adopted from the user's `ign-workflow` FASE 7 contract.
+- **`args.openPr` (optional boolean)**: with explicit consent given at launch, the
+  handoff agent pushes the integration branch and **creates** the PR via `gh` against
+  `pr.base` (default `develop`), applying the optional `pr` fields (`assignees`,
+  `labels`, `milestone`, `closes`). It never merges the PR — that gate stays human.
+- Startup validation covers the new args: `openPr` must be a boolean, `pr` an object.
+- The workflow's return value now includes `handoff` (file path, proposed bump, PR URL).
+
 ## [0.4.3] - 2026-07-15
 
 ### Fixed

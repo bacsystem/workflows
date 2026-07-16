@@ -26,7 +26,7 @@ test('build script embeds the args validation and the template invokes it before
   assert.ok(output.includes('function assertAcyclic('));
   assert.ok(!output.includes('__VALIDATION_SOURCE__'));
   assert.ok(!output.includes('import '), 'the built file must be self-contained, no imports');
-  const validateIndex = output.indexOf('validateWorkflowArgs({ tasks, graph, integrationBranch })');
+  const validateIndex = output.indexOf('validateWorkflowArgs({ tasks, graph, integrationBranch, openPr, pr })');
   assert.ok(validateIndex >= 0, 'the template must invoke validateWorkflowArgs with integrationBranch');
   assert.ok(
     validateIndex < output.indexOf('agent('),
@@ -43,7 +43,7 @@ test('built workflow tolerates args delivered as a JSON string (real harness beh
 
 test('built workflow names the integration branch explicitly instead of letting agents guess', () => {
   assert.ok(
-    output.includes('integrationBranch } = resolvedArgs'),
+    output.includes('integrationBranch, openPr, pr } = resolvedArgs'),
     'integrationBranch debe venir de los args resueltos (objeto o string parseado)'
   );
   assert.ok(
@@ -157,6 +157,42 @@ test('built workflow returns failure causes as messages, not raw Error objects (
     output.includes('r.error?.message ?? String(r.error)') &&
       output.includes('serializableResults'),
     'un Error de JS serializa a {} en JSON: el objeto results retornado perdía la causa de cada tarea failed'
+  );
+});
+
+test('built workflow ships a Handoff phase that prepares the git-flow handoff (v0.5.0)', () => {
+  assert.ok(output.includes("{ title: 'Handoff' }"), 'la fase debe estar declarada en meta.phases');
+  assert.ok(output.includes('function handoff('), 'debe existir la función handoff');
+  assert.equal(
+    (output.match(/await handoff\(/g) ?? []).length, 1,
+    'handoff se invoca exactamente una vez'
+  );
+  assert.ok(
+    output.indexOf('mergedCount > 0') < output.indexOf('await handoff('),
+    'handoff solo corre si algo mergeó (mismo gate que la review final)'
+  );
+  assert.ok(
+    output.includes('.superpowers/sdd/handoff.md'),
+    'el entregable es un handoff.md en el repo objetivo'
+  );
+  assert.ok(
+    output.includes('handoff: handoffResult'),
+    'el resultado del handoff viaja en el return del workflow'
+  );
+});
+
+test('built workflow opens the PR only with explicit openPr consent, and never merges it', () => {
+  assert.ok(
+    output.includes('openPr === true'),
+    'crear el PR requiere openPr: true explícito en args'
+  );
+  assert.ok(
+    output.includes('gh pr create --base'),
+    'el PR se crea con gh contra la base declarada'
+  );
+  assert.ok(
+    output.includes('Do NOT merge'),
+    'el prompt debe prohibir mergear el PR — esa puerta es humana'
   );
 });
 

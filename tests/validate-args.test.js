@@ -52,6 +52,15 @@ test('rechaza ids de tarea duplicados en vez de perder una tarea en silencio', (
     /duplicate task id 1/i);
 });
 
+test('acepta openPr booleano y pr objeto; rechaza formas inválidas', () => {
+  const tasks = [{ id: 1, title: 'A' }];
+  const graph = { 1: [] };
+  assert.doesNotThrow(() => validateWorkflowArgs({ tasks, graph, ...BRANCH, openPr: true, pr: { base: 'develop', closes: 42 } }));
+  assert.throws(() => validateWorkflowArgs({ tasks, graph, ...BRANCH, openPr: 'yes' }), /openPr/);
+  assert.throws(() => validateWorkflowArgs({ tasks, graph, ...BRANCH, pr: 'develop' }), /args\.pr/);
+  assert.throws(() => validateWorkflowArgs({ tasks, graph, ...BRANCH, pr: ['x'] }), /args\.pr/);
+});
+
 test('rechaza un grafo cíclico', () => {
   const tasks = [{ id: 1, title: 'A' }, { id: 2, title: 'B' }];
   assert.throws(() => validateWorkflowArgs({ tasks, graph: { 1: [2], 2: [1] }, ...BRANCH }),

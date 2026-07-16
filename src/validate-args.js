@@ -4,7 +4,7 @@ import { assertAcyclic, assertUniqueTaskIds } from './graph-builder.js';
 // un ciclo en ese grafo deja a runDag esperando su propia promesa memoizada para
 // siempre — deadlock sin error ni log. Esta validación corre antes de lanzar cualquier
 // agente para que el fallo sea inmediato y explicable.
-export function validateWorkflowArgs({ tasks, graph, integrationBranch }) {
+export function validateWorkflowArgs({ tasks, graph, integrationBranch, openPr, pr }) {
   if (!Array.isArray(tasks) || tasks.length === 0) {
     throw new Error('args.tasks must be a non-empty array');
   }
@@ -16,6 +16,14 @@ export function validateWorkflowArgs({ tasks, graph, integrationBranch }) {
     // rama de integración — en un repo con master y develop pueden elegir distinto y
     // ambos reportar MERGED. Mejor exigirla de entrada.
     throw new Error('args.integrationBranch must name the branch merges target (e.g. "develop")');
+  }
+  if (openPr !== undefined && typeof openPr !== 'boolean') {
+    // Crear un PR es un acto hacia afuera: el consentimiento debe ser explícito e
+    // inequívoco, no un string truthy accidental.
+    throw new Error('args.openPr must be a boolean when present');
+  }
+  if (pr !== undefined && (pr === null || typeof pr !== 'object' || Array.isArray(pr))) {
+    throw new Error('args.pr must be an object ({ base, assignees, labels, milestone, closes }) when present');
   }
 
   assertUniqueTaskIds(tasks);
