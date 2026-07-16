@@ -12,6 +12,21 @@ Java/Spring Boot projects, nothing in the design is tied to a specific language.
 
 Design spec: `docs/superpowers/specs/2026-07-04-parallel-plan-executor-design.md`.
 
+## What kind of thing is this? (plugin? skill? neither)
+
+Neither. This repo is a **`Workflow` script** — a third kind of Claude Code extension,
+different from plugins and skills:
+
+- It is **not a plugin**: you don't install it through `/plugin` or a marketplace.
+- It is **not a skill**: it doesn't live under `.claude/skills/` and isn't invoked
+  through the Skill tool.
+- It is a **script for Claude Code's `Workflow` tool**: you clone this repo anywhere on
+  your machine, and Claude Code runs the script by absolute path
+  (`scriptPath: <clone>/workflows/parallel-plan-executor.js`) when you ask it to.
+
+The only piece of it that gets "installed" in the Claude Code sense is the optional
+`/run-plan` slash command (a single `.md` file you copy — see below).
+
 ## Requirements
 
 - **[Claude Code](https://claude.com/claude-code)**, with access to the `Workflow` tool.
@@ -21,6 +36,14 @@ Design spec: `docs/superpowers/specs/2026-07-04-parallel-plan-executor-design.md
   assistant (ChatGPT, Gemini, etc.) can interpret. What *is* agnostic is the **target
   project** being automated: it can be Go, Node, Java, or whatever stack the plan
   describes.
+- **The [superpowers](https://github.com/anthropics/claude-plugins) plugin, installed in
+  Claude Code.** This is a hard dependency, not a nice-to-have: the workflow's
+  implementer and reviewer agents run the `task-brief` and `review-package` scripts from
+  superpowers' `subagent-driven-development` skill, follow its
+  `test-driven-development` skill, and the final review uses its
+  `requesting-code-review` template. The plans this workflow executes are also written
+  with its `writing-plans` skill. Installing this repo does **not** install superpowers
+  for you — do it first (see Installation, step 0).
 - **Node.js >= 20** (for `bin/parse-plan.js` and the test suite — no runtime
   dependencies, just standard Node).
 - Git, and a clean working tree in the project you're automating.
@@ -30,7 +53,15 @@ Design spec: `docs/superpowers/specs/2026-07-04-parallel-plan-executor-design.md
 ## Installation
 
 ```bash
-# 1. Clone this repo (where the workflow lives) onto your machine
+# 0. Inside Claude Code, install the superpowers plugin if you don't have it yet:
+#    type /plugin, open the marketplace, and install "superpowers".
+#    Verify: the skill listing should show superpowers:writing-plans,
+#    superpowers:subagent-driven-development, etc.
+
+# 1. Clone this repo (where the workflow lives) onto your machine.
+#    WHERE: anywhere you like — your home folder, a tools directory, etc.
+#    It does NOT need to be inside .claude/, and it does NOT need to live next to
+#    the projects you'll automate; every path you pass it later is absolute.
 git clone <this-repo-url> parallel-plan-executor
 cd parallel-plan-executor
 
@@ -49,7 +80,40 @@ npm run build
 ```
 
 That's it — the workflow is invoked **from a Claude Code session**, no need to publish
-it to npm or install it globally. See Usage below.
+it to npm or install it globally. See Usage below. Before your first real run, also do
+the one-time **permissions setup** below so task merges don't get blocked mid-run.
+
+## One-time permissions setup (merges)
+
+The workflow's merge agents run `git merge` inside your target repo. Claude Code treats
+an agent merging code as a sensitive action, and what happens depends on your
+permission mode:
+
+- **Default (normal) mode**: nothing to configure. The first time a merge agent runs
+  `git merge`, you get Claude Code's native permission dialog — **Allow once / Allow
+  always / Deny**. Pick "Allow always" on the first one and the rest of the run flows
+  without asking again.
+- **Auto mode**: there is no dialog by default — an automatic classifier decides alone,
+  and it may block agent merges even when you authorized the run up front (see the
+  permissions note further down for why). To get the same yes/no dialog as normal mode,
+  add an **`ask` rule** to the **target project's** `.claude/settings.json` (create the
+  file if needed):
+
+```json
+{
+  "permissions": {
+    "ask": [
+      "Bash(git merge:*)",
+      "Bash(git -C * merge *)"
+    ]
+  }
+}
+```
+
+With that rule in place, every `git merge` from any agent pauses and asks **you**,
+deterministically, regardless of mode — you just click, never type. If you'd rather
+never be asked, use `"allow"` instead of `"ask"` (the run becomes fully hands-off; the
+human gate moves to the final PR review).
 
 ## How it works
 
@@ -194,6 +258,40 @@ node bin/parse-plan.js /path/to/your-plan.md > /tmp/plan-graph.json
 #               # permissions note below)
 ```
 
+## Optional: the `/run-plan` slash command
+
+If you'd rather not type out the natural-language request from the step-by-step guide
+every time, this repo ships a Claude Code custom slash command that wraps it:
+`commands/run-plan.md`.
+
+### Installing it
+
+1. Copy `commands/run-plan.md` from this repo to either:
+   - `~/.claude/commands/run-plan.md` — available in **every** project on your machine, or
+   - `<your-project>/.claude/commands/run-plan.md` — available only inside that one project.
+
+   Global (`~/.claude/commands/`) is the right choice for most people, since this tool is
+   meant to be invoked against other projects, not just the one it happens to live in.
+
+2. Open the copied file and replace the `REPO = ...` placeholder near the top with the
+   absolute path where you cloned **this** repo (`parallel-plan-executor`), e.g.
+   `REPO = /home/you/parallel-plan-executor`. This is the one thing you must edit — the
+   command has no other way to find the workflow script.
+
+3. That's it — no restart needed. Claude Code picks up commands under `.claude/commands/`
+   the next time you use them.
+
+### Using it
+
+```
+/run-plan /path/to/your-plan.md /path/to/your/project feature/my-plan
+```
+
+All three arguments are optional to type up front — the command will ask you for
+anything you leave out, plus whatever `Usage` above lists as optional (`openPr`, `pr`
+fields, your merge authorization). It never invents your authorization text on your
+behalf; it always asks you to name the branches yourself.
+
 ## Handoff phase (v0.5.0)
 
 When at least one task merged, a final **handoff agent** prepares the git-flow closing
@@ -226,15 +324,17 @@ shared branch without human review), a failed run costs one `git branch -D`, and
 human gate sits exactly where it belongs — the single `feature/<plan> → develop` PR you
 open via `git-flow` after reviewing the finished branch.
 
-**Permissions note**: if you run under Claude Code's auto mode, the permission
-classifier may require human authorization for the workflow's merge agents regardless of
-the target branch — and that authorization has to reach the agent doing the merge, not
-just be mentioned in your conversation with Claude. That's what `mergeAuthorization` is
-for: pass your explicit, branch-naming authorization text in `args` so each merge agent
-sees it directly. Without it, a merge agent has no way to know consent was already
-given, and some subagents chose to self-block out of caution even when authorization
-existed — inconsistently, between tasks in the same run (see finding F8 in
-`docs/pilots/2026-07-15-pilot-stats-bitacora.md`).
+**Permissions note (read this if a merge gets blocked)**: under Claude Code's auto
+mode, an automatic classifier judges each agent action on its own, and agent-performed
+`git merge` is exactly the pattern it watches for. Passing your authorization text via
+`args.mergeAuthorization` helps the *merge agent itself* not self-block out of caution
+(finding F8 in `docs/pilots/2026-07-15-pilot-stats-bitacora.md`) — but it does **not**
+bind the classifier: in a later real run the classifier explicitly rejected that relayed
+text as "self-asserted, unverifiable" consent and blocked the merge anyway. The
+deterministic fix is the **one-time permissions setup** near the top of this README: an
+`ask` (or `allow`) rule for `git merge` in the target project's `.claude/settings.json`,
+added by you. Rules take precedence over the mode — with the rule in place you get a
+plain yes/no dialog (or silent allow) instead of a classifier judgment call.
 
 ## Safety checks (v0.2)
 

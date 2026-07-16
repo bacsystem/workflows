@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-07-16
+
+### Docs
+
+- Add `commands/run-plan.md`, a Claude Code slash command template that wraps launching
+  the workflow (parse the plan, ask for what's missing, confirm, invoke `Workflow`) so
+  users don't have to type the natural-language request by hand every time.
+- Document installing it (global `~/.claude/commands/` vs. project-scoped) and using it,
+  in both `README.md` and `README.es.md`.
+- New "What kind of thing is this?" section in both READMEs: this is a `Workflow`
+  script, not a plugin and not a skill — clone it anywhere, Claude Code runs it by
+  absolute path.
+- Document the **superpowers plugin as a hard requirement** (its
+  `subagent-driven-development` scripts, TDD and code-review skills are used by the
+  workflow's agents), including how to install it (`/plugin`) as step 0.
+- New "One-time permissions setup (merges)" section: in default mode the native
+  Allow/Deny dialog just works; in auto mode add an `ask` rule for `git merge` to the
+  target project's `.claude/settings.json`. Corrected the permissions note accordingly:
+  `mergeAuthorization` mitigates merge-agent self-blocking (F8) but does **not** bind
+  the auto-mode permission classifier, which rejected the relayed text as unverifiable
+  in a real run — the deterministic fix is the user-added permission rule.
+- Pilot 8 log updated with the full F8 outcome and the proposed F9 (skip merge agent
+  when the task branch is already an ancestor of the integration branch).
+
 ## [0.5.1] - 2026-07-16
 
 ### Fixed

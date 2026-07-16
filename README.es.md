@@ -12,6 +12,20 @@ Node y en Java/Spring Boot, y no hay nada en el diseño atado a un lenguaje en p
 
 Spec de diseño: `docs/superpowers/specs/2026-07-04-parallel-plan-executor-design.md`.
 
+## ¿Qué tipo de cosa es esto? (¿plugin? ¿skill? ninguno)
+
+Ninguno de los dos. Este repo es un **script de `Workflow`** — un tercer tipo de
+extensión de Claude Code, distinto de plugins y skills:
+
+- **No es un plugin**: no se instala con `/plugin` ni desde un marketplace.
+- **No es una skill**: no vive bajo `.claude/skills/` ni se invoca con la tool Skill.
+- Es un **script para la tool `Workflow` de Claude Code**: clonás este repo en cualquier
+  lugar de tu máquina, y Claude Code corre el script por ruta absoluta
+  (`scriptPath: <clon>/workflows/parallel-plan-executor.js`) cuando se lo pedís.
+
+Lo único que sí se "instala" en el sentido de Claude Code es el comando opcional
+`/run-plan` (un solo archivo `.md` que copiás — ver más abajo).
+
 ## Requisitos
 
 - **[Claude Code](https://claude.com/claude-code)**, con acceso a la tool `Workflow`.
@@ -21,6 +35,14 @@ Spec de diseño: `docs/superpowers/specs/2026-07-04-parallel-plan-executor-desig
   Gemini, etc.) pueda interpretar — el workflow en sí depende de Claude Code. Lo que sí es
   agnóstico es el **proyecto que termina automatizando**: puede ser Go, Node, Java, o
   cualquier stack que el plan describa.
+- **El plugin [superpowers](https://github.com/anthropics/claude-plugins), instalado en
+  Claude Code.** Es una dependencia dura, no un opcional: los agentes implementadores y
+  revisores del workflow corren los scripts `task-brief` y `review-package` de la skill
+  `subagent-driven-development` de superpowers, siguen su skill de
+  `test-driven-development`, y la revisión final usa su template de
+  `requesting-code-review`. Los planes que este workflow ejecuta también se escriben con
+  su skill `writing-plans`. Instalar este repo **no** te instala superpowers — hacelo
+  primero (ver Instalación, paso 0).
 - **Node.js >= 20** (para `bin/parse-plan.js` y la suite de tests — ninguna dependencia
   de runtime, todo con el Node estándar).
 - Git, y un repo con working tree limpio para el proyecto que vas a automatizar.
@@ -30,7 +52,15 @@ Spec de diseño: `docs/superpowers/specs/2026-07-04-parallel-plan-executor-desig
 ## Instalación
 
 ```bash
-# 1. Cloná este repositorio (donde vive el workflow) en tu máquina
+# 0. Dentro de Claude Code, instalá el plugin superpowers si todavía no lo tenés:
+#    escribí /plugin, abrí el marketplace, e instalá "superpowers".
+#    Verificación: el listado de skills debería mostrar superpowers:writing-plans,
+#    superpowers:subagent-driven-development, etc.
+
+# 1. Cloná este repositorio (donde vive el workflow) en tu máquina.
+#    DÓNDE: donde quieras — tu carpeta de usuario, un directorio de herramientas, etc.
+#    NO necesita estar dentro de .claude/, y NO necesita estar al lado de los proyectos
+#    que vas a automatizar; todas las rutas que le pases después son absolutas.
 git clone <url-de-este-repo> parallel-plan-executor
 cd parallel-plan-executor
 
@@ -50,6 +80,40 @@ npm run build
 
 Con esto el repo queda listo. El workflow se invoca **desde una sesión de Claude Code**
 (no hace falta publicarlo en npm ni instalarlo globalmente) — ver la sección de Uso.
+Antes de tu primera corrida real, hacé también la **configuración de permisos** de abajo
+(una sola vez) para que los merges de tareas no se bloqueen a mitad de corrida.
+
+## Configuración de permisos, una sola vez (merges)
+
+Los agentes de merge del workflow corren `git merge` dentro de tu repo destino. Claude
+Code trata a un agente mergeando código como una acción sensible, y lo que pasa depende
+de tu modo de permisos:
+
+- **Modo normal (default)**: no hay nada que configurar. La primera vez que un agente de
+  merge corre `git merge`, te aparece el diálogo nativo de permisos de Claude Code —
+  **Allow once / Allow always / Deny**. Elegí "Allow always" en el primero y el resto de
+  la corrida fluye sin volver a preguntar.
+- **Modo automático**: por defecto no hay diálogo — un clasificador automático decide
+  solo, y puede bloquear los merges de agentes incluso habiendo autorizado vos la corrida
+  de entrada (ver la nota de permisos más abajo para el porqué). Para tener el mismo
+  diálogo yes/no del modo normal, agregá una **regla `ask`** al `.claude/settings.json`
+  del **proyecto destino** (creá el archivo si no existe):
+
+```json
+{
+  "permissions": {
+    "ask": [
+      "Bash(git merge:*)",
+      "Bash(git -C * merge *)"
+    ]
+  }
+}
+```
+
+Con esa regla puesta, cada `git merge` de cualquier agente se pausa y te pregunta **a
+vos**, de forma determinística, sin importar el modo — solo hacés click, nunca escribís.
+Si preferís que no te pregunte nunca, usá `"allow"` en vez de `"ask"` (la corrida queda
+100% sin manos; la puerta humana se muda a la revisión del PR final).
 
 ## Cómo funciona
 
@@ -197,6 +261,43 @@ node bin/parse-plan.js /ruta/a/tu-plan.md > /tmp/plan-graph.json
 #               # permisos más abajo)
 ```
 
+## Opcional: el comando `/run-plan`
+
+Si preferís no escribir la solicitud en lenguaje natural de la guía paso a paso cada vez,
+este repo trae un comando personalizado de Claude Code que la envuelve:
+`commands/run-plan.md`.
+
+### Cómo instalarlo
+
+1. Copiá `commands/run-plan.md` de este repo a alguna de estas dos ubicaciones:
+   - `~/.claude/commands/run-plan.md` — disponible en **todos** tus proyectos en esta
+     máquina, o
+   - `<tu-proyecto>/.claude/commands/run-plan.md` — disponible solo dentro de ese
+     proyecto puntual.
+
+   Para la mayoría de los casos conviene la global (`~/.claude/commands/`), porque esta
+   herramienta está pensada para invocarse contra otros proyectos, no solo el que la
+   contiene.
+
+2. Abrí el archivo copiado y reemplazá el placeholder `REPO = ...` cerca del comienzo por
+   la ruta absoluta donde clonaste **este** repo (`parallel-plan-executor`), por ejemplo
+   `REPO = /home/vos/parallel-plan-executor`. Es lo único que hay que editar — el comando
+   no tiene otra forma de encontrar el script del workflow.
+
+3. Listo — no hace falta reiniciar nada. Claude Code toma los comandos bajo
+   `.claude/commands/` la próxima vez que los uses.
+
+### Cómo usarlo
+
+```
+/run-plan /ruta/a/tu-plan.md /ruta/a/tu/proyecto feature/mi-plan
+```
+
+Los tres argumentos son opcionales de escribir de entrada — el comando te va a preguntar
+lo que falte, más lo que la sección "Uso" de arriba lista como opcional (`openPr`,
+campos de `pr`, tu autorización de merge). Nunca inventa tu texto de autorización por su
+cuenta; siempre te pide que nombres vos las ramas.
+
 ## Fase de Handoff (v0.5.0)
 
 Cuando al menos una tarea se integró, un agente final de **handoff** prepara el cierre
@@ -230,15 +331,19 @@ solo `git branch -D`, y la puerta humana queda exactamente donde debe estar — 
 `feature/<plan> → develop` que abrís vos con la skill `git-flow` una vez que revisaste la
 rama terminada.
 
-**Nota sobre permisos**: si corrés bajo el modo automático de Claude Code, el
-clasificador de permisos puede exigir autorización humana para los agentes de merge del
-workflow, sin importar la rama destino — y esa autorización debe llegar al agente que
-hace el merge, no solo mencionarse en la conversación con vos. Por eso conviene pasar
-`mergeAuthorization` con tu frase textual (nombrando las ramas) en `args`: sin ese campo,
-el agente de merge no tiene forma de saber que ya diste consentimiento, y algunos
-subagentes eligieron autobloquearse por precaución incluso habiendo autorización — de
-forma inconsistente entre tareas del mismo run (ver hallazgo F8 en
-`docs/pilots/2026-07-15-pilot-stats-bitacora.md`).
+**Nota sobre permisos (leé esto si un merge se bloquea)**: bajo el modo automático de
+Claude Code, un clasificador automático juzga cada acción de agente por su cuenta, y un
+`git merge` ejecutado por un agente es exactamente el patrón que vigila. Pasar tu
+autorización textual vía `args.mergeAuthorization` ayuda a que el *propio agente de
+merge* no se autobloquee por precaución (hallazgo F8 en
+`docs/pilots/2026-07-15-pilot-stats-bitacora.md`) — pero **no** obliga al clasificador:
+en una corrida real posterior, el clasificador rechazó explícitamente ese texto relayado
+como consentimiento "autoafirmado, no verificable" y bloqueó el merge igual. El fix
+determinístico es la **configuración de permisos de una sola vez** al comienzo de este
+README: una regla `ask` (o `allow`) para `git merge` en el `.claude/settings.json` del
+proyecto destino, agregada por vos. Las reglas tienen precedencia sobre el modo — con la
+regla puesta tenés un diálogo simple de yes/no (o allow silencioso) en vez del juicio
+del clasificador.
 
 ## Chequeos de seguridad (v0.2)
 
