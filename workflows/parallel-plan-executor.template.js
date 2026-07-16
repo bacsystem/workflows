@@ -20,14 +20,22 @@ export const meta = {
 // invocado la tool (comprobado en el piloto 2026-07-15): destructurar el string daba
 // tasks undefined y un error que culpaba al campo equivocado.
 const resolvedArgs = typeof args === 'string' ? JSON.parse(args) : args;
-const { graph, tasks, planPath, repoPath, integrationBranch, openPr, pr } = resolvedArgs;
-validateWorkflowArgs({ tasks, graph, integrationBranch, openPr, pr }); // falla rápido y claro, nunca deadlock
+const { graph, tasks, planPath, repoPath, integrationBranch, openPr, pr, mergeAuthorization } = resolvedArgs;
+validateWorkflowArgs({ tasks, graph, integrationBranch, openPr, pr, mergeAuthorization }); // falla rápido y claro, nunca deadlock
 const tasksById = new Map(tasks.map((t) => [t.id, t]));
 
+// Piloto 2026-07-16, hallazgo F7: la primera redacción mandaba a cada agente a correr
+// `find /` (todo el disco) como primer intento — en Windows/Git Bash eso no termina en
+// el timeout de 120s del harness y se va solo a segundo plano. Cada agente (implement Y
+// review, uno por tarea) repetía el mismo escaneo desde cero. Ahora el primer intento es
+// acotado al home del usuario; `find /` queda solo como último recurso.
 const FIND_SDD_SCRIPTS =
-  'Locate the superpowers:subagent-driven-development skill\'s scripts directory — search ' +
-  'under the Claude Code plugin cache for a path ending in ' +
-  '"subagent-driven-development/scripts" (it contains task-brief and review-package).';
+  'Locate the superpowers:subagent-driven-development skill\'s scripts directory: it lives ' +
+  'under the Claude Code plugin cache, in a path ending "subagent-driven-development/scripts" ' +
+  '(contains task-brief and review-package). Try first, scoped to the user\'s home directory ' +
+  '(e.g. `find ~ -ipath "*subagent-driven-development*" 2>/dev/null` or an equivalent Glob ' +
+  'anchored there) — do NOT start with a whole-filesystem `find /`; only fall back to that ' +
+  'if the scoped search truly finds nothing.';
 
 const IMPLEMENTER_SCHEMA = {
   type: 'object',
@@ -286,7 +294,17 @@ async function executeTask(taskId) {
       agent(
         `Merge branch task-${taskId} into branch ${integrationBranch} of repo ${repoPath}. Report ` +
         `mergeStatus MERGED on success. If there is a real merge conflict, do not resolve it ` +
-        `automatically — stop and report mergeStatus CONFLICT with the conflict details in "detail".`,
+        `automatically — stop and report mergeStatus CONFLICT with the conflict details in "detail".` +
+        (mergeAuthorization
+          // Piloto 2026-07-16, hallazgo F8: sin esto, el agente de merge no tiene forma de
+          // saber que el usuario ya autorizó el run — algunos se autobloqueaban leyendo la
+          // política de "merges requieren autorización humana" de memoria, inconsistentemente
+          // entre tareas del mismo run. La autorización debe llegar textual, no inferida.
+          ? `\n\nThe user has already explicitly authorized merges for this run, in their own ` +
+            `words: "${mergeAuthorization}". This covers task-${taskId} into ${integrationBranch}. ` +
+            `Proceed with the merge on that basis — do not withhold it pending further ` +
+            `authorization, and do not treat this as something requiring a fresh consent check.`
+          : ''),
         { label: `merge-${taskId}`, phase: 'Merge', schema: MERGE_SCHEMA }
       )
     ),

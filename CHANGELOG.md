@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-07-16
+
+### Fixed
+
+- Merge agents now receive the user's explicit merge authorization
+  (`args.mergeAuthorization`) directly in their prompt. Previously, authorization given
+  in conversation with the orchestrating session never reached the merge subagent, which
+  sometimes self-blocked — reading the account's "merges require human authorization"
+  policy from memory — inconsistently between tasks in the same run (pilot 8, finding F8).
+- `FIND_SDD_SCRIPTS` no longer starts with a whole-filesystem `find /` to locate the
+  `subagent-driven-development` scripts; it now scopes the first attempt to the user's
+  home directory, avoiding ~10 minutes of wasted time and orphaned background shells per
+  agent on Windows (pilot 8, finding F7).
+
+### Docs
+
+- Added `README.es.md` (Spanish translation) with installation instructions, clarifying
+  that the workflow requires Claude Code specifically — not "any AI assistant".
+- `README.md`: added Requirements/Installation sections, updated the merge-authorization
+  example and permissions note, removed an outdated line contradicting the Handoff phase.
+
 ## [0.5.0] - 2026-07-15
 
 ### Added
