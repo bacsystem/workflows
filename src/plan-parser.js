@@ -112,3 +112,19 @@ function parseInterfaces(body, taskId, warnings) {
   }
   return interfaces;
 }
+
+// Devuelve el bloque completo de una tarea ("### Task N: <título>" + cuerpo hasta el
+// próximo header de tarea o EOF), o null si el id no existe. Es la fuente del
+// task-brief: el implementador lee SOLO su tarea, nunca el plan entero.
+export function extractTaskBlock(planText, taskId) {
+  planText = planText.replace(/\r\n/g, '\n');
+  const parts = planText.split(TASK_HEADER_RE);
+  // parts = [preámbulo, id1, título1, cuerpo1, id2, título2, cuerpo2, ...]
+  for (let i = 1; i < parts.length; i += 3) {
+    if (Number(parts[i]) !== taskId) continue;
+    // El separador "---" entre tareas pertenece al plan, no a la tarea.
+    const body = parts[i + 2].replace(/\n---\s*$/, '\n');
+    return `### Task ${parts[i]}: ${parts[i + 1]}${body}`;
+  }
+  return null;
+}
