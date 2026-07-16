@@ -40,8 +40,25 @@ node bin/parse-plan.js /path/to/your-plan.md > /tmp/plan-graph.json
 #            graph: <the "graph" field of plan-graph.json>,
 #            planPath: "/path/to/your-plan.md",
 #            repoPath: "/path/to/your/project",
-#            integrationBranch: "develop" }  # the branch every task merges into (required)
+#            integrationBranch: "feature/my-plan",  # the branch every task merges into (required)
+#            openPr: true,                          # optional: push + open the PR at the end
+#            pr: { base: "develop", assignees: ["me"], labels: ["story"],
+#                  milestone: "v1.2", closes: 42 } }  # optional PR fields (git-flow contract)
 ```
+
+## Handoff phase (v0.5.0)
+
+When at least one task merged, a final **handoff agent** prepares the git-flow closing
+for you — without executing it. It writes `.superpowers/sdd/handoff.md` in the target
+repo with: a suggested Conventional-Commit PR title, a full PR body (Summary / Type of
+change / Main changes / Version / Checklist), the proposed SemVer bump derived from the
+run's commits (git-flow rules, `0.x` included), the final review verdict, and a post-run
+cleanup checklist.
+
+With **`openPr: true`** (explicit consent given at launch) it additionally pushes the
+integration branch and **creates** the pull request via `gh` against `pr.base` (default
+`develop`), applying the optional `pr` fields — assignees, labels, milestone, and
+`Closes #<closes>` in the body. **It never merges the PR**: that gate is human, always.
 
 ## Recommended branching topology (validated in pilot 4)
 
