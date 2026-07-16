@@ -71,6 +71,17 @@ test('built workflow threads the user\'s merge authorization into the merge prom
   );
 });
 
+test('built workflow short-circuits merges of already-integrated branches (pilot 8, F9)', () => {
+  assert.ok(
+    output.includes('merge-base --is-ancestor task-${taskId}'),
+    'el prompt de merge debe chequear ancestría (solo lectura) antes de intentar el merge'
+  );
+  assert.ok(
+    output.includes('already an ancestor, nothing to do'),
+    'una rama ya integrada debe reportar MERGED sin correr ningún comando de merge'
+  );
+});
+
 test('built workflow scopes the SDD-scripts search instead of scanning the whole filesystem first (pilot 8, F7)', () => {
   assert.ok(
     output.includes('Try first, scoped'),

@@ -292,7 +292,15 @@ async function executeTask(taskId) {
     taskId,
     await enqueueMainRepo(() =>
       agent(
-        `Merge branch task-${taskId} into branch ${integrationBranch} of repo ${repoPath}. Report ` +
+        // Piloto 8, hallazgo F9: en corridas repetidas sobre el mismo repo, la rama de una
+        // task ya integrada volvía a pasar por `git merge` (no-op) y ese intento inútil
+        // igual se exponía al clasificador de permisos — un bloqueo ahí tumbaba TODA la
+        // corrida en cascada. El chequeo de ancestría es de solo lectura y corta antes.
+        `First run \`git -C ${repoPath} merge-base --is-ancestor task-${taskId} ` +
+        `${integrationBranch}\`. If it exits 0, branch task-${taskId} is ALREADY integrated: ` +
+        `report mergeStatus MERGED with detail "already an ancestor, nothing to do" and do ` +
+        `NOT run any merge command.\n\n` +
+        `Otherwise, merge branch task-${taskId} into branch ${integrationBranch} of repo ${repoPath}. Report ` +
         `mergeStatus MERGED on success. If there is a real merge conflict, do not resolve it ` +
         `automatically — stop and report mergeStatus CONFLICT with the conflict details in "detail".` +
         (mergeAuthorization
