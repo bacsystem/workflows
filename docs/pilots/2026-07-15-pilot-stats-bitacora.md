@@ -319,3 +319,47 @@ más allá de `long`, como string ✓); `/5` → 120 ✓; `/-1` → 400 con `Err
   record — polish real, no ruido.
 - Los agentes usaron las rutas absolutas de JDK/Maven declaradas en Global Constraints
   sin fricción (no estaban en el PATH de la sesión).
+
+---
+
+# Piloto 7 — pilot-handoff (mismo día, v0.5.0): estreno de la fase Handoff
+
+Dos tareas Node independientes (`parseDuration` ∥ `formatBytes`), topología GitFlow
+(`master ← develop ← feature/format-utils`), handoff en modo **prepare-only** (sin
+`openPr` — los repos piloto no tienen remoto).
+
+## ✅ El objetivo del piloto: la fase Handoff, validada en su primer run real
+
+El agente de handoff entregó `handoff.md` con todo lo diseñado, y mejor de lo esperado:
+
+- **Título de PR** convencional y **body completo** (Summary / Type of change / Main
+  changes por tarea / Version / Checklist).
+- **Bump SemVer con el razonamiento exacto de git-flow**: `feat` dominante, package 0.x,
+  sin BREAKING → **patch → 0.1.1** (aplicó bien la regla 0.x, la que más se equivoca la
+  gente).
+- **Checklist de limpieza con comandos exactos**, incluyendo el matiz `-d` vs `-D` según
+  el momento del borrado de `task-1`.
+- **Honestidad no pedida**: propagó el "Ready to merge? No" de la review final como
+  caveat destacado — "este handoff prepara el PR, pero no mergear hasta que Task 2
+  aterrice". Exactamente el criterio que un humano querría.
+
+## ⛔ F6 escaló a su forma final: bloqueo de agentes arbitrarios y de retries
+
+- Run inicial: `implement-2` bloqueado por el clasificador como "Auto Mode Bypass" —
+  **falso positivo** (agente legítimo del run autorizado; su gemelo `implement-1`,
+  idéntico en forma, pasó). La task 1 completó todo el pipeline — incluido el merge,
+  que pasó dentro del workflow gracias a la autorización nombrada — y la review final
+  detectó el hueco de la task 2 con precisión.
+- Resume: bloqueado también — `implement-2` por ser "retry de una acción bloqueada sin
+  mensaje nuevo del usuario", y hasta `review-1` (ruta cacheada). Doctrina resultante:
+  **cada reintento requiere un mensaje humano fresco que lo autorice**.
+- Decisión: piloto cerrado con la task 2 sin implementar (repo descartable; el objetivo
+  era el handoff y está cumplido). Lección operativa sumada a F6: en modo auto,
+  presupuestar una autorización humana por (re)intento, o reglas de permisos
+  pre-acordadas por el humano.
+
+## Veredicto del piloto 7
+
+**v0.5.0 validada**: la fase Handoff produce exactamente el entregable diseñado y
+propaga la verdad de la review. Pendiente: probar `openPr: true` (push + creación real
+del PR con los 5 campos) contra un repo GitHub real del usuario.
