@@ -61,6 +61,14 @@ test('acepta openPr booleano y pr objeto; rechaza formas inválidas', () => {
   assert.throws(() => validateWorkflowArgs({ tasks, graph, ...BRANCH, pr: ['x'] }), /args\.pr/);
 });
 
+test('acepta mergeAuthorization string; rechaza formas no-string', () => {
+  const tasks = [{ id: 1, title: 'A' }];
+  const graph = { 1: [] };
+  assert.doesNotThrow(() => validateWorkflowArgs({ tasks, graph, ...BRANCH, mergeAuthorization: 'Autorizo mergear task-1' }));
+  assert.throws(() => validateWorkflowArgs({ tasks, graph, ...BRANCH, mergeAuthorization: true }), /mergeAuthorization/);
+  assert.throws(() => validateWorkflowArgs({ tasks, graph, ...BRANCH, mergeAuthorization: 42 }), /mergeAuthorization/);
+});
+
 test('rechaza un grafo cíclico', () => {
   const tasks = [{ id: 1, title: 'A' }, { id: 2, title: 'B' }];
   assert.throws(() => validateWorkflowArgs({ tasks, graph: { 1: [2], 2: [1] }, ...BRANCH }),

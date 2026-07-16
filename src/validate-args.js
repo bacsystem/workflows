@@ -4,7 +4,7 @@ import { assertAcyclic, assertUniqueTaskIds } from './graph-builder.js';
 // un ciclo en ese grafo deja a runDag esperando su propia promesa memoizada para
 // siempre — deadlock sin error ni log. Esta validación corre antes de lanzar cualquier
 // agente para que el fallo sea inmediato y explicable.
-export function validateWorkflowArgs({ tasks, graph, integrationBranch, openPr, pr }) {
+export function validateWorkflowArgs({ tasks, graph, integrationBranch, openPr, pr, mergeAuthorization }) {
   if (!Array.isArray(tasks) || tasks.length === 0) {
     throw new Error('args.tasks must be a non-empty array');
   }
@@ -24,6 +24,13 @@ export function validateWorkflowArgs({ tasks, graph, integrationBranch, openPr, 
   }
   if (pr !== undefined && (pr === null || typeof pr !== 'object' || Array.isArray(pr))) {
     throw new Error('args.pr must be an object ({ base, assignees, labels, milestone, closes }) when present');
+  }
+  if (mergeAuthorization !== undefined && typeof mergeAuthorization !== 'string') {
+    // Piloto 2026-07-16, hallazgo F8: sin este campo, el agente de merge no tiene forma
+    // de saber que el usuario ya autorizó el run — y a veces se autobloquea leyendo la
+    // política de "merges requieren autorización humana" de memoria, inconsistentemente
+    // entre tareas. Debe ser las palabras textuales del usuario, no un booleano.
+    throw new Error('args.mergeAuthorization must be a string (the user\'s own authorization words) when present');
   }
 
   assertUniqueTaskIds(tasks);

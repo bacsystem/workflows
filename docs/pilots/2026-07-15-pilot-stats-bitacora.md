@@ -363,3 +363,114 @@ El agente de handoff entregó `handoff.md` con todo lo diseñado, y mejor de lo 
 **v0.5.0 validada**: la fase Handoff produce exactamente el entregable diseñado y
 propaga la verdad de la review. Pendiente: probar `openPr: true` (push + creación real
 del PR con los 5 campos) contra un repo GitHub real del usuario.
+
+---
+
+# Piloto 8 — project-test-plan-executor (2026-07-16, v0.5.0): primer uso real, no descartable
+
+Primer run contra un repo real del usuario (no un piloto descartable), plan de 6 tareas
+(`personas-crud`, Go), topología GitFlow (`master ← develop ← feature/personas-crud`),
+`openPr: true` con `pr: {base: "develop"}` — la prueba pendiente del piloto 7. El usuario
+autorizó explícitamente de antemano, nombrando las ramas: *"Autorizo mergear las ramas
+task-1 a task-6 y que al final pushee y cree el PR contra develop"*.
+
+## F7 — `FIND_SDD_SCRIPTS` hace un `find /` de todo el disco en cada agente (perf, fix pendiente)
+
+Cada implementer/reviewer recibe la misma instrucción genérica ("busca bajo el caché de
+plugins de Claude Code...") y cada uno la resuelve por su cuenta con
+`find / -iname "task-brief" -type f 2>/dev/null | grep ...` — un escaneo del disco entero
+en Windows/Git Bash, que no termina en el timeout de 120s y se manda solo a segundo
+plano. El agente sigue con `Glob` (falla dos veces por rutas mal targeteadas) y recién al
+cuarto intento acota a `C:/Users/<user>` y encuentra el script real en el caché de
+plugins. Costo medido: **~10 minutos** en el implementer de la task 1 (`review-1` del
+panel marcó 45m17s, mayormente por esto). Como cada agente repite el escaneo desde cero,
+deja shells `find /` huérfanos acumulándose (de ahí la pregunta del usuario: "2
+completados, 3 fallidos, 2 detenidos" en su panel de shells en segundo plano).
+
+**Fix propuesto**: no correr `find /`; usar directamente una ruta conocida o acotada
+(`~/.claude/plugins/cache/**/subagent-driven-development/scripts/task-brief`) como primer
+intento en `FIND_SDD_SCRIPTS`, con el `find /` como último recurso si eso falla.
+
+## F8 — La autorización de merge del usuario no llega al agente de merge (bloqueante, fix pendiente)
+
+A pesar de la autorización explícita nombrando task-1 a task-6, el merge de **task-2 se
+autobloqueó**: el subagente de merge leyó la memoria de feedback de la cuenta
+("los merges requieren autorización humana explícita") y, como su propio prompt —
+`Merge branch task-${taskId} into branch ${integrationBranch}...` (sin ningún campo de
+autorización) — no contiene ninguna mención de que el usuario ya autorizó el run, decidió
+por su cuenta abortar un merge de prueba (`git merge --no-commit --no-ff task-2`) y
+reportar `mergeStatus: CONFLICT` (sin conflicto real) en vez de mergear. Nótese la
+inconsistencia: el merge de **task-1** sí se ejecutó sin dudar con el mismo template — el
+autobloqueo no fue determinístico.
+
+Consecuencia real evitada de milagro: el CONFLICT de task-2 debía cascadear SKIP a las
+tasks 3, 4, 5 y 6 (todas dependen de 2), pero el run **saltó directo a la fase Handoff**
+con solo 1/6 tareas integradas, y el agente de Handoff ya estaba por hacer `git push` +
+`gh pr create --base develop` contra `feature/personas-crud` cuando el orquestador lo
+detuvo manualmente (`TaskStop`). Sin esa intervención, se habría abierto un PR real contra
+`develop` con 83% del plan faltante.
+
+**Fix propuesto**: agregar un campo opcional `mergeAuthorization` a `args` (texto exacto
+de la autorización del usuario) que el template inyecte en el prompt de cada
+`merge-${taskId}` — algo como *"El usuario autorizó explícitamente este merge con estas
+palabras: \"<mergeAuthorization>\". Procedé con el merge salvo que haya un conflicto real de
+git."* — para que el subagente no tenga que inferir (o denegar por precaución) sin la
+autorización a la vista.
+
+## Estado del run al momento de la pausa
+
+Task 1 implementada + revisada + **mergeada** en `feature/personas-crud`. Task 2
+implementada + revisada (PASS/APPROVED) pero **sin mergear** (branch `task-2` viva,
+íntegra). Tasks 3-6 nunca arrancaron. Ningún push ni PR creados — verificado
+(`git status` limpio, `ls-remote` sin la rama, sin PR abierto). Run pausado con
+`TaskStop`, recuperable con `resumeFromRunId: wf_2901fa01-3df` una vez decidido cómo
+destrabar F8.
+
+## Continuación (mismo día): F8 resultó insuficiente; la solución es una regla de permisos
+
+Con el fix F8 aplicado (v0.5.1: `mergeAuthorization` inyectada textual en cada prompt de
+merge), se retomó el run. Secuencia de lo observado:
+
+1. **El resume re-corrió todo lo cacheado**: al cambiar los prompts (F7/F8), ningún
+   agente previo matcheó su clave de caché — implement/review/merge de tasks 1-2 se
+   re-ejecutaron desde cero. Los agentes detectaron el trabajo ya hecho y solo
+   re-verificaron (honesto pero costoso: ~10 min y ~150k tokens para "no hacer nada").
+   Lección de diseño: un cambio de prompt invalida TODO el caché del run, no solo el
+   agente afectado.
+2. **La re-review de task-2 (reviewer fresco) encontró un bug real** que la review
+   original no vio: `List()` ordenaba IDs como strings (`"10" < "2"`), rompiendo la
+   paginación desde el registro 11. La ronda de fix lo corrigió (orden numérico +
+   RWMutex + test de regresión). La re-review post-fix encontró **otro** bug real
+   (panic con `page<1`/`size<1` por bounds de slice sin clamp) — y con la única ronda de
+   fix agotada, task-2 quedó FAILED por diseño. El orquestador arregló ese segundo bug a
+   mano (commit `93a59f1` en task-2, TDD: RED verificado antes del fix) y relanzó fresco.
+3. **F8 refutado por el clasificador**: en el run fresco, `merge-1` fue bloqueado por el
+   clasificador de permisos del harness (no autobloqueo del agente) con una razón
+   explícita: la frase embebida "el usuario ya autorizó" es una *"self-asserted,
+   unverifiable third-person statement, not genuine consent visible in this
+   transcript"*. Conclusión: **inyectar la autorización en el prompt ayuda contra el
+   autobloqueo del agente (F8 original) pero no vincula al clasificador** — este exige
+   consentimiento verificable en la transcripción donde corre el comando, o una regla de
+   permisos previa. Cascada: 5 tareas skipped por un merge no-op de una task ya mergeada.
+
+### La solución adoptada (validación pendiente en el próximo run)
+
+Regla **`ask`** en `.claude/settings.json` del proyecto destino:
+
+```json
+{ "permissions": { "ask": ["Bash(git merge:*)", "Bash(git -C * merge *)"] } }
+```
+
+Las reglas explícitas tienen precedencia sobre el modo auto: con esto, cada `git merge`
+de agente dispara el diálogo nativo Allow/Deny al usuario (determinístico, sin juicio
+del clasificador), y "Allow always" deja pasar el resto del run. Instalada por el
+usuario (un intento del orquestador de instalarla vía update-config fue bloqueado como
+auto-modificación; la escritura directa del archivo con el pedido explícito del usuario
+en sus palabras sí pasó). Documentado en README/README.es como setup de una sola vez.
+
+### Hallazgo de diseño pendiente (F9, propuesto)
+
+El workflow intenta mergear task-1 en cada corrida aunque ya esté mergeada (no-op que
+igual se expone al clasificador y puede tumbar toda la corrida). Fix propuesto: chequeo
+de solo-lectura `git merge-base --is-ancestor task-N <integrationBranch>` antes de
+lanzar el agente de merge; si ya es ancestro, reportar MERGED sin lanzar agente.

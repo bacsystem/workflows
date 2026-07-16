@@ -26,7 +26,7 @@ test('build script embeds the args validation and the template invokes it before
   assert.ok(output.includes('function assertAcyclic('));
   assert.ok(!output.includes('__VALIDATION_SOURCE__'));
   assert.ok(!output.includes('import '), 'the built file must be self-contained, no imports');
-  const validateIndex = output.indexOf('validateWorkflowArgs({ tasks, graph, integrationBranch, openPr, pr })');
+  const validateIndex = output.indexOf('validateWorkflowArgs({ tasks, graph, integrationBranch, openPr, pr, mergeAuthorization })');
   assert.ok(validateIndex >= 0, 'the template must invoke validateWorkflowArgs with integrationBranch');
   assert.ok(
     validateIndex < output.indexOf('agent('),
@@ -43,7 +43,7 @@ test('built workflow tolerates args delivered as a JSON string (real harness beh
 
 test('built workflow names the integration branch explicitly instead of letting agents guess', () => {
   assert.ok(
-    output.includes('integrationBranch, openPr, pr } = resolvedArgs'),
+    output.includes('integrationBranch, openPr, pr, mergeAuthorization } = resolvedArgs'),
     'integrationBranch debe venir de los args resueltos (objeto o string parseado)'
   );
   assert.ok(
@@ -57,6 +57,28 @@ test('built workflow names the integration branch explicitly instead of letting 
   assert.ok(
     !output.includes('the integration branch of repo'),
     'no debe quedar ninguna referencia a una rama de integración sin nombre'
+  );
+});
+
+test('built workflow threads the user\'s merge authorization into the merge prompt (pilot 8, F8)', () => {
+  assert.ok(
+    output.includes('(mergeAuthorization\n'),
+    'el prompt de merge debe condicionar en mergeAuthorization'
+  );
+  assert.ok(
+    output.includes('The user has already explicitly authorized merges for this run'),
+    'sin este texto, el agente de merge no tiene forma de saber que el usuario ya autorizó el run y puede autobloquearse leyendo la memoria de la cuenta'
+  );
+});
+
+test('built workflow scopes the SDD-scripts search instead of scanning the whole filesystem first (pilot 8, F7)', () => {
+  assert.ok(
+    output.includes('Try first, scoped'),
+    'debe existir la instrucción de acotar la búsqueda al home del usuario'
+  );
+  assert.ok(
+    output.includes('find ~ -ipath'),
+    'el primer intento debe ser un find acotado al home, no `find /`'
   );
 });
 
