@@ -5,6 +5,79 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.2 — 2026-07-17
+
+New (cys F3 — see `docs/cys/specs/2026-07-16-cys-ecosystem-design.md`):
+
+- `/cys:flow` — the all-in-one plugin command: idea → `cys:design` →
+  `cys:plan` → parallel-plan-executor run, with user approval gates at
+  every stage. Zero-config via `${CLAUDE_PLUGIN_ROOT}`.
+- `skills/check/references/code-standards.md` — clean-code standards;
+  the engine's implement **and review** prompts point agents at it by
+  exact path, and `cys:check` cites it in its code-quality verdict
+  (post-review fix: the doc claims reviewers hold implementations to it —
+  now they actually do).
+- Pilot 9 bitácora: F9 validated in production; F10 (consent-check
+  wording flagged as bypass) and F11 (classifier citing stale assistant
+  memory) documented with their fixes.
+- `tests/skills.test.js` now guards command frontmatter too.
+- Design spec addendum (§10): reconciles `/cys`/`/cys-run` naming with
+  the shipped `/cys:flow`/`/cys:run-plan`, and documents that the
+  standalone-install independence-proof pilot is descoped from the
+  automated plan — it runs as a separate interactive session with the user.
+
+## 0.6.1 — 2026-07-16
+
+New (cys F2 — see `docs/cys/specs/2026-07-16-cys-ecosystem-design.md`):
+
+- The **cys plugin**: `.claude-plugin/plugin.json` + self-hosted marketplace
+  (`/plugin marketplace add bacsystem/parallel-plan-executor`, then
+  `/plugin install cys@bacsystem`).
+- Five skills under `skills/`: `cys:ship` (migrated from the author's
+  git-flow skill), `cys:design`, `cys:plan`, `cys:check`, `cys:guide`
+  (written from scratch, English).
+- `tests/skills.test.js` guards manifests and SKILL.md frontmatter.
+- Docs: plugin install section (EN/ES); the external plan-authoring
+  dependency demoted from hard requirement to optional (`cys:plan` covers
+  it natively now).
+
+Fixed (out-of-plan, same branch):
+
+- `fix(merge)` F10: the merge prompt now affirms the user's authorization
+  without instructing agents to skip consent checks — the previous F8
+  wording was flagged by the permission classifier as a bypass attempt and
+  killed 3 of 5 merge agents mid-run.
+- Project `ask` permission rule for `git merge` in `.claude/settings.json`:
+  agent merges pause for the user's dialog click instead of being judged
+  by the automatic classifier.
+- `.gitignore` now covers `.cys/` run records and `.worktrees/`.
+- Post-review polish: `skills/ship/README.md` rewritten for its cys:ship
+  identity (plugin install, no symlink/auto-tag instructions), `/cys-run`
+  references corrected to the real `/cys:run-plan`, `commands/run-plan.md`
+  defaults REPO to `${CLAUDE_PLUGIN_ROOT}` (zero-config as a plugin
+  command), and `tests/skills.test.js` pins plugin.json version to
+  package.json.
+
+## 0.6.0 — 2026-07-16
+
+**BREAKING** (0.x → minor per git-flow rules):
+
+- `args.executorPath` is now required: the absolute path of this clone. The
+  implement/review prompts invoke `bin/task-brief.js` and `bin/review-package.js`
+  by exact path — no more locating an external plugin's scripts by scanning the
+  filesystem (kills pilot finding F7 at the root; F4's copy step is gone too,
+  the brief is written straight into the target repo).
+- The run record moved from an external plugin's convention to `.cys/`
+  (progress.md ledger, task briefs/reports, review packages, handoff.md).
+- The engine no longer depends on any external plugin at runtime. Plans
+  authored elsewhere still worked as a stopgap until cys F2 shipped
+  `cys:plan` natively.
+
+New (cys F1 — see `docs/cys/specs/2026-07-16-cys-ecosystem-design.md`):
+
+- `bin/task-brief.js <plan> <taskId> <outDir>` — extracts one task's block.
+- `bin/review-package.js <repo> <base> <head> <outDir>` — commit list + stat + diff.
+
 ## [0.5.2] - 2026-07-16
 
 ### Docs
@@ -17,9 +90,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New "What kind of thing is this?" section in both READMEs: this is a `Workflow`
   script, not a plugin and not a skill — clone it anywhere, Claude Code runs it by
   absolute path.
-- Document the **superpowers plugin as a hard requirement** (its
-  `subagent-driven-development` scripts, TDD and code-review skills are used by the
-  workflow's agents), including how to install it (`/plugin`) as step 0.
+- Document an **external skill plugin as a hard requirement** (its
+  task-orchestration scripts, TDD and code-review skills were used by the
+  workflow's agents at the time), including how to install it (`/plugin`) as step 0.
 - New "One-time permissions setup (merges)" section: in default mode the native
   Allow/Deny dialog just works; in auto mode add an `ask` rule for `git merge` to the
   target project's `.claude/settings.json`. Corrected the permissions note accordingly:
@@ -38,10 +111,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in conversation with the orchestrating session never reached the merge subagent, which
   sometimes self-blocked — reading the account's "merges require human authorization"
   policy from memory — inconsistently between tasks in the same run (pilot 8, finding F8).
-- `FIND_SDD_SCRIPTS` no longer starts with a whole-filesystem `find /` to locate the
-  `subagent-driven-development` scripts; it now scopes the first attempt to the user's
-  home directory, avoiding ~10 minutes of wasted time and orphaned background shells per
-  agent on Windows (pilot 8, finding F7).
+- The script-locating helper no longer starts with a whole-filesystem `find /` to
+  locate the external plugin's task-orchestration scripts; it now scopes the first
+  attempt to the user's home directory, avoiding ~10 minutes of wasted time and
+  orphaned background shells per agent on Windows (pilot 8, finding F7).
 
 ### Docs
 
@@ -55,7 +128,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Handoff phase**: when at least one task merged, a final agent prepares the git-flow
-  closing — `.superpowers/sdd/handoff.md` with a suggested PR title, full PR body
+  closing — a `handoff.md` run-record file with a suggested PR title, full PR body
   (Summary/Type/Main changes/Version/Checklist), the SemVer bump proposed from the run's
   Conventional Commits (git-flow rules incl. `0.x`), the final review verdict, and a
   post-run cleanup checklist. Adopted from the user's `ign-workflow` FASE 7 contract.
@@ -92,8 +165,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   release it when done — which also frees `task-N` for the fix round (the old
   checkout-conflict caveat disappears).
 - Pilot finding F4: `task-brief` writes the brief into the agent's cwd; the implement
-  prompt now ensures a copy lands under `<repoPath>/.superpowers/sdd/` where the reviewer
-  reads it.
+  prompt now ensures a copy lands under the target repo's run-record directory where
+  the reviewer reads it.
 - Pilot finding F5: the workflow logs `Task N: started (implement)` when a task begins —
   previously the progress bar only emitted on settlement, leaving the first ~10 minutes
   of a run silent.
@@ -183,7 +256,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whole line does, and header names may now contain digits, hyphens or `&`
   (`**Non-Goals:**`).
 - Ledger appends go through the same main-repo queue as fixes and merges (two tasks
-  failing simultaneously raced on `.superpowers/sdd/progress.md`), and the ledger line is
+  failing simultaneously raced on the same ledger file), and the ledger line is
   framed in `<line>` tags so quotes in free-form agent text can't break the prompt.
 - `formatDuration`/`hhmmssToSeconds` accept 1–2 digit components but validate ranges:
   `10:75:00` now yields `duration unknown` instead of a confidently wrong duration.

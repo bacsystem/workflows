@@ -14,7 +14,7 @@ Requires Node >= 20. ESM (`"type": "module"`), zero runtime dependencies.
 
 ## What this repo is
 
-A Claude Code `Workflow` script that executes a `superpowers:writing-plans` implementation plan, running independent tasks in parallel instead of one at a time. The dependency DAG between tasks is inferred from each task's `Consumes`/`Produces` block and from files touched in common.
+A Claude Code `Workflow` script that executes a `cys:plan` implementation plan (`### Task N:` blocks with `Consumes`/`Produces`), running independent tasks in parallel instead of one at a time. The dependency DAG between tasks is inferred from each task's `Consumes`/`Produces` block and from files touched in common. The repo also ships the **cys plugin** (`.claude-plugin/` + `skills/`): six skills covering design → plan → run → check → ship plus a guide index.
 
 ## Architecture
 
@@ -30,8 +30,8 @@ The project is split in two halves because the Workflow sandbox has no filesyste
    - Per task: implement in an isolated git worktree (branch `task-<id>`) → adversarial review (spec PASS/FAIL + quality APPROVED/NEEDS_FIXES) → at most one fix round → serialized merge (one at a time, DAG order). A failed task (including merge CONFLICT, BLOCKED, NEEDS_CONTEXT) cascades SKIP to all transitive dependents. After the final review, a **Handoff** agent prepares the git-flow closing (`handoff.md` with PR title/body and SemVer bump; with `openPr: true` it pushes and creates the PR — never merges it).
    - Wall-clock times come from the agents themselves (they run `date`); the script only does string math on `HH:MM:SS` values.
 
-Design spec: `docs/superpowers/specs/2026-07-04-parallel-plan-executor-design.md` (§7 documents evaluated-and-deferred features — retry-later for missed dependencies, speculative re-execution). Flow diagram: `docs/diagram/flujo-parallel-plan-executor.mmd`.
+Design spec: `docs/cys/specs/2026-07-04-parallel-plan-executor-design.md` (§7 documents evaluated-and-deferred features — retry-later for missed dependencies, speculative re-execution). cys ecosystem spec: `docs/cys/specs/2026-07-16-cys-ecosystem-design.md`. Flow diagram: `docs/diagram/flujo-parallel-plan-executor.mmd`.
 
 ## Branches
 
-Work happens on feature/fix branches off `develop`; PRs target `develop`, and `master` is the release branch.
+Work happens on feature/fix branches off `develop`; PRs target `develop`, and `main` is the release branch.

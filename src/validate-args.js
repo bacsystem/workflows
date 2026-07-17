@@ -4,7 +4,7 @@ import { assertAcyclic, assertUniqueTaskIds } from './graph-builder.js';
 // un ciclo en ese grafo deja a runDag esperando su propia promesa memoizada para
 // siempre — deadlock sin error ni log. Esta validación corre antes de lanzar cualquier
 // agente para que el fallo sea inmediato y explicable.
-export function validateWorkflowArgs({ tasks, graph, integrationBranch, openPr, pr, mergeAuthorization }) {
+export function validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization }) {
   if (!Array.isArray(tasks) || tasks.length === 0) {
     throw new Error('args.tasks must be a non-empty array');
   }
@@ -16,6 +16,11 @@ export function validateWorkflowArgs({ tasks, graph, integrationBranch, openPr, 
     // rama de integración — en un repo con master y develop pueden elegir distinto y
     // ambos reportar MERGED. Mejor exigirla de entrada.
     throw new Error('args.integrationBranch must name the branch merges target (e.g. "develop")');
+  }
+  if (typeof executorPath !== 'string' || executorPath.trim() === '') {
+    // Los prompts corren bin/task-brief.js y bin/review-package.js por ruta exacta; sin
+    // ella cada agente tendría que escanear el disco buscando scripts (hallazgo F7).
+    throw new Error('args.executorPath must be the absolute path of the parallel-plan-executor clone (its bin/ scripts are invoked by exact path)');
   }
   if (openPr !== undefined && typeof openPr !== 'boolean') {
     // Crear un PR es un acto hacia afuera: el consentimiento debe ser explícito e

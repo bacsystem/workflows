@@ -2,15 +2,15 @@
 
 *[Leer esto en español](README.es.md)*
 
-A Claude Code `Workflow` that executes a `superpowers:writing-plans` implementation
-plan, running independent tasks in parallel via a dependency DAG inferred from each
-task's `Consumes`/`Produces` block — instead of one task at a time like
-`superpowers:subagent-driven-development` does by default.
+A Claude Code `Workflow` that executes a `cys:plan` implementation plan, running
+independent tasks in parallel via a dependency DAG inferred from each task's
+`Consumes`/`Produces` block — instead of one task at a time like sequential plan
+executors do.
 
 The **generated code** is technology-agnostic — validated against both Node and
 Java/Spring Boot projects, nothing in the design is tied to a specific language.
 
-Design spec: `docs/superpowers/specs/2026-07-04-parallel-plan-executor-design.md`.
+Design spec: `docs/cys/specs/2026-07-04-parallel-plan-executor-design.md`.
 
 ## What kind of thing is this? (plugin? skill? neither)
 
@@ -25,7 +25,49 @@ different from plugins and skills:
   (`scriptPath: <clone>/workflows/parallel-plan-executor.js`) when you ask it to.
 
 The only piece of it that gets "installed" in the Claude Code sense is the optional
-`/run-plan` slash command (a single `.md` file you copy — see below).
+`/run-plan` slash command (a single `.md` file you copy — see below), or the **cys
+plugin** described next.
+
+## The cys plugin
+
+**cys** is this repo's skill plugin: five skills covering the whole flow
+**design → plan → run → check → ship**, named after the author's twin daughters,
+**Cielo y Sophia**.
+
+Install it from this repo's self-hosted marketplace, inside Claude Code:
+
+```
+/plugin marketplace add bacsystem/parallel-plan-executor
+/plugin install cys@bacsystem
+```
+
+The first line resolves the short `owner/repo` GitHub form. Two equivalent
+alternatives, if you need them:
+
+```
+# Full GitHub URL instead of the short form
+/plugin marketplace add https://github.com/bacsystem/parallel-plan-executor
+
+# A local clone instead of GitHub (e.g. to test uncommitted changes)
+/plugin marketplace add /absolute/path/to/your/clone
+```
+
+| Skill | What it does |
+|---|---|
+| `cys:design` | idea → spec |
+| `cys:plan` | spec → implementation plan |
+| `cys:run` | the Workflow in this repo — launched via `/cys:run-plan` or `commands/run-plan.md` |
+| `cys:check` | adversarial review / verification |
+| `cys:ship` | commit / SemVer bump / PR |
+| `cys:guide` | index — which skill to use when |
+
+Note: installing the plugin also exposes this repo's `commands/run-plan.md` as the
+`/cys:run-plan` slash command — no manual file copying needed.
+
+The plugin also ships `/cys:flow` — the all-in-one entry point: give it a
+target repo and an idea, and it walks the whole flow (design → plan →
+parallel run) with your approval gates at each stage. Use `/cys:run-plan`
+instead when an approved plan already exists.
 
 ## Requirements
 
@@ -36,14 +78,10 @@ The only piece of it that gets "installed" in the Claude Code sense is the optio
   assistant (ChatGPT, Gemini, etc.) can interpret. What *is* agnostic is the **target
   project** being automated: it can be Go, Node, Java, or whatever stack the plan
   describes.
-- **The [superpowers](https://github.com/anthropics/claude-plugins) plugin, installed in
-  Claude Code.** This is a hard dependency, not a nice-to-have: the workflow's
-  implementer and reviewer agents run the `task-brief` and `review-package` scripts from
-  superpowers' `subagent-driven-development` skill, follow its
-  `test-driven-development` skill, and the final review uses its
-  `requesting-code-review` template. The plans this workflow executes are also written
-  with its `writing-plans` skill. Installing this repo does **not** install superpowers
-  for you — do it first (see Installation, step 0).
+- **The cys plugin** (see above) for authoring plans with `cys:plan`. The engine is
+  fully self-contained: the workflow ships its own `task-brief`/`review-package`
+  scripts in `bin/` and records runs under `.cys/`. Any plan following the
+  `### Task N:` + `Consumes`/`Produces` format works, whatever tool wrote it.
 - **Node.js >= 20** (for `bin/parse-plan.js` and the test suite — no runtime
   dependencies, just standard Node).
 - Git, and a clean working tree in the project you're automating.
@@ -53,11 +91,6 @@ The only piece of it that gets "installed" in the Claude Code sense is the optio
 ## Installation
 
 ```bash
-# 0. Inside Claude Code, install the superpowers plugin if you don't have it yet:
-#    type /plugin, open the marketplace, and install "superpowers".
-#    Verify: the skill listing should show superpowers:writing-plans,
-#    superpowers:subagent-driven-development, etc.
-
 # 1. Clone this repo (where the workflow lives) onto your machine.
 #    WHERE: anywhere you like — your home folder, a tools directory, etc.
 #    It does NOT need to be inside .claude/, and it does NOT need to live next to
@@ -138,10 +171,10 @@ reference.
 ### Step 0 — What you need ready before starting
 
 - **An approved implementation plan**, with numbered tasks and their
-  `Consumes`/`Produces` blocks (the format produced by the `superpowers:writing-plans`
-  skill). If you don't have one yet, ask Claude Code, from your project's repo: *"help
-  me write an implementation plan for [your feature]"* — that runs the matching skill
-  and leaves the plan file ready.
+  `Consumes`/`Produces` blocks (the format produced by the `cys:plan` skill). If you
+  don't have one yet, ask Claude Code, from your project's repo: *"help me write an
+  implementation plan for [your feature]"* — with the cys plugin installed that runs
+  `cys:design` → `cys:plan` and leaves the plan file ready.
 - **The repo you're automating**, with a clean working tree (`git status` shows no
   pending changes) and, if you'll request `openPr: true` at the end, a GitHub remote
   already configured with `gh auth status` green.
@@ -216,7 +249,7 @@ plan. If that happens:
 
 ### Step 5 — When it finishes
 
-- If **at least one task merged**, you'll have a `.superpowers/sdd/handoff.md` file in
+- If **at least one task merged**, you'll have a `.cys/handoff.md` file in
   your project with: the suggested PR title and body, the proposed SemVer bump, and a
   cleanup checklist (which `task-N` branches to delete and when).
 - If you requested `openPr: true`, the PR is **already created** in GitHub against the
@@ -249,6 +282,8 @@ node bin/parse-plan.js /path/to/your-plan.md > /tmp/plan-graph.json
 #            planPath: "/path/to/your-plan.md",
 #            repoPath: "/path/to/your/project",
 #            integrationBranch: "feature/my-plan",  # the branch every task merges into (required)
+#            executorPath: "<this-repo>",           # absolute path of this clone: the workflow
+#                                                   # runs its bin/ scripts by exact path (required)
 #            openPr: true,                          # optional: push + open the PR at the end
 #            pr: { base: "develop", assignees: ["me"], labels: ["story"],
 #                  milestone: "v1.2", closes: 42 },  # optional PR fields (git-flow contract)
@@ -295,7 +330,7 @@ behalf; it always asks you to name the branches yourself.
 ## Handoff phase (v0.5.0)
 
 When at least one task merged, a final **handoff agent** prepares the git-flow closing
-for you — without executing it. It writes `.superpowers/sdd/handoff.md` in the target
+for you — without executing it. It writes `.cys/handoff.md` in the target
 repo with: a suggested Conventional-Commit PR title, a full PR body (Summary / Type of
 change / Main changes / Version / Checklist), the proposed SemVer bump derived from the
 run's commits (git-flow rules, `0.x` included), the final review verdict, and a post-run
@@ -312,7 +347,7 @@ Point `integrationBranch` at an **ephemeral feature branch cut from `develop`** 
 at `develop`/`main` directly:
 
 ```
-master (release)                 ← never touched by agents
+main (release)                   ← never touched by agents
   └── develop (integration)     ← never touched by agents
         └── feature/<plan>      ← integrationBranch: task branches merge here ★
               ├── task-1        ← one isolated worktree per implementer

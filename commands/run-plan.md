@@ -5,15 +5,19 @@ argument-hint: [plan-path] [repo-path] [integration-branch]
 
 ## What this command does
 
-Runs the `parallel-plan-executor` Workflow against a `superpowers:writing-plans` plan,
+Runs the `parallel-plan-executor` Workflow against a `cys:plan` implementation plan,
 executing its independent tasks in parallel instead of one at a time.
 
-REPO = `<ABSOLUTE-PATH-TO-YOUR-CLONE-OF-parallel-plan-executor>`
+REPO = `${CLAUDE_PLUGIN_ROOT}`
 
 <!--
-  Replace the path above with wherever you cloned this repo before using this command
-  (see README.md / README.es.md, section "Installing the /run-plan command"). Everything
-  below refers to that path as REPO.
+  When this command runs as part of the cys plugin (/cys:run-plan), CLAUDE_PLUGIN_ROOT
+  resolves to the installed plugin's directory — which IS the parallel-plan-executor
+  repo, so the command is zero-config. If instead you copied this file by hand to
+  ~/.claude/commands/ (standalone /run-plan), replace the value above with the absolute
+  path of your clone (see README.md / README.es.md). Everything below refers to that
+  path as REPO. If REPO cannot be resolved (the variable is empty and no path was
+  substituted), ask the user for the clone's absolute path before continuing.
 -->
 
 ## Steps
@@ -54,8 +58,9 @@ REPO = `<ABSOLUTE-PATH-TO-YOUR-CLONE-OF-parallel-plan-executor>`
 
 6. **Launch**: invoke the `Workflow` tool with:
    - `scriptPath`: `<REPO>/workflows/parallel-plan-executor.js`
-   - `args`: `{ tasks, graph, planPath, repoPath, integrationBranch, openPr, pr, mergeAuthorization }`
-     (omit `openPr`/`pr`/`mergeAuthorization` if not provided)
+   - `args`: `{ tasks, graph, planPath, repoPath, integrationBranch, executorPath: <REPO>, openPr, pr, mergeAuthorization }`
+     (executorPath is REPO — the workflow invokes REPO/bin scripts by exact path;
+     omit `openPr`/`pr`/`mergeAuthorization` if not provided)
 
 7. **After launching**: tell the user it's running in the background, mention they can
    ask "how's the workflow going?" any time or open `/workflows`, and that you'll report

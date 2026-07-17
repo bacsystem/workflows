@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { validateWorkflowArgs } from '../src/validate-args.js';
 
 // Args mínimos válidos; cada test sobreescribe lo que quiere romper.
-const BRANCH = { integrationBranch: 'develop' };
+const BRANCH = { integrationBranch: 'develop', executorPath: 'D:/tools/parallel-plan-executor' };
 
 test('acepta args válidos con un DAG consistente', () => {
   const tasks = [{ id: 1, title: 'A' }, { id: 2, title: 'B' }];
@@ -26,6 +26,20 @@ test('rechaza una integrationBranch ausente o vacía: los agentes de merge no de
   assert.throws(() => validateWorkflowArgs({ tasks, graph, integrationBranch: '' }), /integrationBranch/);
   assert.throws(() => validateWorkflowArgs({ tasks, graph, integrationBranch: '   ' }), /integrationBranch/);
   assert.throws(() => validateWorkflowArgs({ tasks, graph, integrationBranch: 42 }), /integrationBranch/);
+});
+
+test('rechaza un executorPath ausente o vacío: los prompts invocan bin/ por ruta exacta', () => {
+  const base = {
+    tasks: [{ id: 1 }],
+    graph: { 1: [] },
+    integrationBranch: 'feature/x',
+  };
+  assert.throws(() => validateWorkflowArgs({ ...base }), /executorPath/);
+  assert.throws(() => validateWorkflowArgs({ ...base, executorPath: '' }), /executorPath/);
+  assert.throws(() => validateWorkflowArgs({ ...base, executorPath: 42 }), /executorPath/);
+  assert.doesNotThrow(() =>
+    validateWorkflowArgs({ ...base, executorPath: 'D:/tools/parallel-plan-executor' })
+  );
 });
 
 test('rechaza un grafo que referencia una tarea inexistente', () => {
