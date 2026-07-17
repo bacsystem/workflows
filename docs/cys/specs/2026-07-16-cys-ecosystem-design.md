@@ -39,7 +39,7 @@ only executes sequentially.
 | 6 | Engine independence | Own `bin/task-brief.js` + `bin/review-package.js` in pure Node (zero deps, tested in `tests/`, task-brief reuses `src/plan-parser.js`). Workflow gains an `executorPath` arg; prompts run `node <executorPath>/bin/...` with exact paths. `FIND_SDD_SCRIPTS` is deleted entirely (kills F7 at the root) |
 | 7 | Script language | Node, not `.sh`: parser already tested, single runtime, Windows-safe. (The Workflow script itself must be JS — tool restriction.) |
 | 8 | Run-record directory | `.cys/` in the target repo replaces `.superpowers/sdd/` (progress.md ledger, task-N-brief.md, task-N-report.md, review-*.diff, handoff.md — same mechanism, own folder) |
-| 9 | Entry points | `/cys` (all-in-one: idea → design → plan → parallel run) + `/cys-run` (plan already exists; replaces `/run-plan`) |
+| 9 | Entry points | `/cys` (all-in-one: idea → design → plan → parallel run) + `/cys-run` (plan already exists; replaces `/run-plan`) — **shipped in F3 as `/cys:flow` and `/cys:run-plan`** (plugin commands auto-namespace under `cys:`; see §10 addendum) |
 | 10 | Language | Skills in English (read by Claude, better performance, shareable); READMEs bilingual EN/ES — same pattern the repo already uses |
 | 11 | Versioning | Single repo SemVer (`package.json`, currently 0.5.2) versions engine + plugin + skills together |
 | 12 | Branch topology | Unchanged from today, with `main` naming: `main` ← `develop` ← `feature/<plan>` (integrationBranch) ← `task-N`. PR base defaults to `develop` |
@@ -98,7 +98,10 @@ parallel-plan-executor/          ← this repo (D:/github/workflows)
   built.
 - **F3 — Commands + cut the cord**: `/cys` and `/cys-run`; full end-to-end pilot run
   **without superpowers installed** (the independence proof), logged as a pilot
-  bitácora like pilots 1-8.
+  bitácora like pilots 1-8. **Descoped from the F3 plan** (see §10 addendum) — the
+  independence proof runs as a separate interactive session with the user, not as
+  an automated plan task (installing/uninstalling the actual plugin isn't something
+  a task-brief can drive).
 
 Pilot project: `D:/github/project-test-plan-executor` (disposable, branch topology
 already set up), one small greenfield mini-project per fase.
@@ -118,6 +121,26 @@ already set up), one small greenfield mini-project per fase.
   integrationBranch prompts continue-or-rename.
 - `/cys-run <plan> <repo> <branch>`: today's `/run-plan` behavior, renamed, with the
   same merge-authorization flow (user names the branches; never fabricated).
+
+## 10. F3 addendum (2026-07-17) — naming reconciliation and descoped pilot
+
+Two corrections after F3 shipped, so this document stays ground truth rather than
+misleading a future reader:
+
+- **Command names**: §6/§7 above describe flat names `/cys` and `/cys-run`. What F3
+  actually shipped is `/cys:flow` (same behavior as the `/cys` described in §7) and
+  `/cys:run-plan` (same behavior as `/cys-run`) — plugin commands auto-namespace
+  under the plugin name (`cys:`), which turned out better than fighting it with a
+  flat alias. Treat every `/cys`/`/cys-run` mention in §6/§7 as `/cys:flow`/
+  `/cys:run-plan`.
+- **The independence-proof pilot** (§6, F3 bullet) was **descoped from the automated
+  F3 plan**: installing/uninstalling the actual superpowers plugin and driving a
+  real `/plugin marketplace add` + `/plugin install` flow isn't something a
+  task-brief can execute — it needs the user's own Claude Code session. It happens
+  as a separate interactive activity with the user after F3 merges, not as one of
+  F3's plan tasks. The pilot-9 bitácora entry F3 added documents F1/F2 dogfooding
+  retroactively, not this pilot — the independence-proof run gets its own bitácora
+  entry when it happens.
 
 ## 8. Testing / verification
 

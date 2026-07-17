@@ -22,7 +22,10 @@ Structure every review as two independent verdicts:
    `file:line`.
 2. **Code quality** — verdict `APPROVED` or `NEEDS_FIXES`.
    Findings categorized as Critical (must fix) / Important (should fix) /
-   Minor (nice to have), each with `file:line`.
+   Minor (nice to have), each with `file:line`. Hold the change to
+   `references/code-standards.md` (naming, unit size, YAGNI, dead code,
+   comments, test hygiene) — a violation is a finding, not a style
+   opinion.
 
 Both verdicts are always required; a beautiful implementation of the
 wrong thing FAILs, an ugly implementation of the right thing may PASS

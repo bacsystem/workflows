@@ -242,9 +242,10 @@ test('built workflow settles every terminal branch and reconciles the progress b
   assert.ok(output.includes('settledCount = results.size'), 'skipped tasks must be reconciled after runDag');
 });
 
-test('built workflow points implementers at the code-standards reference by exact path (cys F3)', () => {
-  assert.ok(
-    output.includes('${executorPath}/skills/check/references/code-standards.md'),
-    'el prompt de implement debe mandar a leer los estándares por ruta exacta, no de memoria'
+test('built workflow points both implementers and reviewers at the code-standards reference (cys F3, review final finding #1)', () => {
+  assert.equal(
+    (output.match(/\$\{executorPath\}\/skills\/check\/references\/code-standards\.md/g) ?? []).length,
+    2,
+    'el documento dice "reviewers hold implementations to them" — debe citarse en implement() Y en review(), no solo en implement()'
   );
 });

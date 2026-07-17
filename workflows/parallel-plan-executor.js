@@ -416,6 +416,8 @@ async function review(task, impl) {
     `implementer's report at ${impl.reportFile}. Treat the report as unverified claims — ` +
     `verify against the diff.\n\n` +
     `Read the "## Global Constraints" section from ${planPath} yourself — it binds this task.\n\n` +
+    `Also read ${executorPath}/skills/check/references/code-standards.md once — code-quality ` +
+    `findings below are held to it (naming, unit size, YAGNI, dead code, comments, test hygiene).\n\n` +
     `Report: Part 1 spec compliance (Missing/Extra/Misunderstood, file:line) — verdict PASS ` +
     `or FAIL. Part 2 code quality (Critical/Important/Minor findings, file:line) — verdict ` +
     `APPROVED or NEEDS_FIXES. Findings text goes in "findings"; both verdicts are required ` +
