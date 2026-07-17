@@ -67,8 +67,8 @@ REPO = `${CLAUDE_PLUGIN_ROOT}`
 
 8. **Create the integration branch if it doesn't exist**: run
    `git -C <repo-path> show-ref --verify --quiet
-   refs/heads/<integrationBranch>`. If it exits non-zero, create it from `develop`:
-   `git -C <repo-path> branch <integrationBranch> develop`. If
+   refs/heads/<integration-branch>`. If it exits non-zero, create it from `develop`:
+   `git -C <repo-path> branch <integration-branch> develop`. If
    it exits 0, the branch already exists — step 7 already handled
    confirming that with the user, nothing more to do here.
 
