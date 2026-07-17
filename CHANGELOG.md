@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.0 — 2026-07-16
+
+**BREAKING** (0.x → minor per git-flow rules):
+
+- `args.executorPath` is now required: the absolute path of this clone. The
+  implement/review prompts invoke `bin/task-brief.js` and `bin/review-package.js`
+  by exact path — no more locating superpowers' scripts by scanning the
+  filesystem (kills pilot finding F7 at the root; F4's copy step is gone too,
+  the brief is written straight into the target repo).
+- The run record moved from `.superpowers/sdd/` to `.cys/` (progress.md ledger,
+  task briefs/reports, review packages, handoff.md).
+- The engine no longer depends on the superpowers plugin at runtime.
+  `superpowers:writing-plans` is still the plan format source until cys F2.
+
+New (cys F1 — see `docs/superpowers/specs/2026-07-16-cys-ecosystem-design.md`):
+
+- `bin/task-brief.js <plan> <taskId> <outDir>` — extracts one task's block.
+- `bin/review-package.js <repo> <base> <head> <outDir>` — commit list + stat + diff.
+
 ## [0.5.2] - 2026-07-16
 
 ### Docs

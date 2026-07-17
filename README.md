@@ -37,13 +37,11 @@ The only piece of it that gets "installed" in the Claude Code sense is the optio
   project** being automated: it can be Go, Node, Java, or whatever stack the plan
   describes.
 - **The [superpowers](https://github.com/anthropics/claude-plugins) plugin, installed in
-  Claude Code.** This is a hard dependency, not a nice-to-have: the workflow's
-  implementer and reviewer agents run the `task-brief` and `review-package` scripts from
-  superpowers' `subagent-driven-development` skill, follow its
-  `test-driven-development` skill, and the final review uses its
-  `requesting-code-review` template. The plans this workflow executes are also written
-  with its `writing-plans` skill. Installing this repo does **not** install superpowers
-  for you — do it first (see Installation, step 0).
+  Claude Code.** The *engine* no longer needs it: the workflow now ships its own
+  `task-brief`/`review-package` scripts in `bin/` and records runs under `.cys/`. It is
+  still required today for **writing plans** (`superpowers:writing-plans`) until cys
+  ships its own design/plan skills (see the cys design spec, fase F2). Installing this
+  repo does **not** install superpowers for you — do it first (see Installation, step 0).
 - **Node.js >= 20** (for `bin/parse-plan.js` and the test suite — no runtime
   dependencies, just standard Node).
 - Git, and a clean working tree in the project you're automating.
@@ -216,7 +214,7 @@ plan. If that happens:
 
 ### Step 5 — When it finishes
 
-- If **at least one task merged**, you'll have a `.superpowers/sdd/handoff.md` file in
+- If **at least one task merged**, you'll have a `.cys/handoff.md` file in
   your project with: the suggested PR title and body, the proposed SemVer bump, and a
   cleanup checklist (which `task-N` branches to delete and when).
 - If you requested `openPr: true`, the PR is **already created** in GitHub against the
@@ -249,6 +247,8 @@ node bin/parse-plan.js /path/to/your-plan.md > /tmp/plan-graph.json
 #            planPath: "/path/to/your-plan.md",
 #            repoPath: "/path/to/your/project",
 #            integrationBranch: "feature/my-plan",  # the branch every task merges into (required)
+#            executorPath: "<this-repo>",           # absolute path of this clone: the workflow
+#                                                   # runs its bin/ scripts by exact path (required)
 #            openPr: true,                          # optional: push + open the PR at the end
 #            pr: { base: "develop", assignees: ["me"], labels: ["story"],
 #                  milestone: "v1.2", closes: 42 },  # optional PR fields (git-flow contract)
@@ -295,7 +295,7 @@ behalf; it always asks you to name the branches yourself.
 ## Handoff phase (v0.5.0)
 
 When at least one task merged, a final **handoff agent** prepares the git-flow closing
-for you — without executing it. It writes `.superpowers/sdd/handoff.md` in the target
+for you — without executing it. It writes `.cys/handoff.md` in the target
 repo with: a suggested Conventional-Commit PR title, a full PR body (Summary / Type of
 change / Main changes / Version / Checklist), the proposed SemVer bump derived from the
 run's commits (git-flow rules, `0.x` included), the final review verdict, and a post-run

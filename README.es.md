@@ -36,13 +36,12 @@ Lo único que sí se "instala" en el sentido de Claude Code es el comando opcion
   agnóstico es el **proyecto que termina automatizando**: puede ser Go, Node, Java, o
   cualquier stack que el plan describa.
 - **El plugin [superpowers](https://github.com/anthropics/claude-plugins), instalado en
-  Claude Code.** Es una dependencia dura, no un opcional: los agentes implementadores y
-  revisores del workflow corren los scripts `task-brief` y `review-package` de la skill
-  `subagent-driven-development` de superpowers, siguen su skill de
-  `test-driven-development`, y la revisión final usa su template de
-  `requesting-code-review`. Los planes que este workflow ejecuta también se escriben con
-  su skill `writing-plans`. Instalar este repo **no** te instala superpowers — hacelo
-  primero (ver Instalación, paso 0).
+  Claude Code.** El *motor* ya no lo necesita: el workflow ahora trae sus propios scripts
+  `task-brief`/`review-package` en `bin/` y registra las corridas bajo `.cys/`. Sigue
+  siendo necesario hoy para **escribir los planes** (`superpowers:writing-plans`), hasta
+  que cys traiga sus propias skills de diseño/planes (ver la spec de diseño de cys,
+  fase F2). Instalar este repo **no** te instala superpowers — hacelo primero (ver
+  Instalación, paso 0).
 - **Node.js >= 20** (para `bin/parse-plan.js` y la suite de tests — ninguna dependencia
   de runtime, todo con el Node estándar).
 - Git, y un repo con working tree limpio para el proyecto que vas a automatizar.
@@ -218,7 +217,7 @@ de tu plan. Si eso pasa:
 ### Paso 5 — Cuando termina
 
 - Si **al menos una tarea se integró**, vas a tener un archivo
-  `.superpowers/sdd/handoff.md` en tu proyecto con: el título y cuerpo de PR sugeridos,
+  `.cys/handoff.md` en tu proyecto con: el título y cuerpo de PR sugeridos,
   la versión SemVer propuesta, y un checklist de limpieza (qué ramas `task-N` borrar y
   cuándo).
 - Si pediste `openPr: true`, el PR **ya va a estar creado** en GitHub contra la rama que
@@ -252,6 +251,8 @@ node bin/parse-plan.js /ruta/a/tu-plan.md > /tmp/plan-graph.json
 #            planPath: "/ruta/a/tu-plan.md",
 #            repoPath: "/ruta/a/tu/proyecto",
 #            integrationBranch: "feature/mi-plan",  # rama a la que se mergea cada tarea (obligatorio)
+#            executorPath: "<este-repo>",           # ruta absoluta de este clon: el workflow
+#                                                   # corre sus scripts bin/ por ruta exacta (obligatorio)
 #            openPr: true,                          # opcional: pushear y abrir el PR al final
 #            pr: { base: "develop", assignees: ["yo"], labels: ["story"],
 #                  milestone: "v1.2", closes: 42 },  # campos opcionales del PR (contrato git-flow)
@@ -301,7 +302,7 @@ cuenta; siempre te pide que nombres vos las ramas.
 ## Fase de Handoff (v0.5.0)
 
 Cuando al menos una tarea se integró, un agente final de **handoff** prepara el cierre
-estilo git-flow — sin ejecutarlo. Escribe `.superpowers/sdd/handoff.md` en el repo
+estilo git-flow — sin ejecutarlo. Escribe `.cys/handoff.md` en el repo
 destino con: un título de PR sugerido en formato Conventional Commit, un body de PR
 completo (Summary / Type of change / Main changes / Version / Checklist), el bump de
 SemVer propuesto según los commits de la corrida (reglas de git-flow, incluido `0.x`), el

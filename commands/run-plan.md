@@ -54,8 +54,9 @@ REPO = `<ABSOLUTE-PATH-TO-YOUR-CLONE-OF-parallel-plan-executor>`
 
 6. **Launch**: invoke the `Workflow` tool with:
    - `scriptPath`: `<REPO>/workflows/parallel-plan-executor.js`
-   - `args`: `{ tasks, graph, planPath, repoPath, integrationBranch, openPr, pr, mergeAuthorization }`
-     (omit `openPr`/`pr`/`mergeAuthorization` if not provided)
+   - `args`: `{ tasks, graph, planPath, repoPath, integrationBranch, executorPath: <REPO>, openPr, pr, mergeAuthorization }`
+     (executorPath is REPO — the workflow invokes REPO/bin scripts by exact path;
+     omit `openPr`/`pr`/`mergeAuthorization` if not provided)
 
 7. **After launching**: tell the user it's running in the background, mention they can
    ask "how's the workflow going?" any time or open `/workflows`, and that you'll report
