@@ -347,7 +347,7 @@ Point `integrationBranch` at an **ephemeral feature branch cut from `develop`** 
 at `develop`/`main` directly:
 
 ```
-master (release)                 ← never touched by agents
+main (release)                   ← never touched by agents
   └── develop (integration)     ← never touched by agents
         └── feature/<plan>      ← integrationBranch: task branches merge here ★
               ├── task-1        ← one isolated worktree per implementer
