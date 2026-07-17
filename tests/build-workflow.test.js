@@ -241,3 +241,10 @@ test('built workflow settles every terminal branch and reconciles the progress b
   assert.ok(output.includes("settle(taskId, 'FAILED (review)')"), 'the review-failed-after-fix branch must count as settled');
   assert.ok(output.includes('settledCount = results.size'), 'skipped tasks must be reconciled after runDag');
 });
+
+test('built workflow points implementers at the code-standards reference by exact path (cys F3)', () => {
+  assert.ok(
+    output.includes('${executorPath}/skills/check/references/code-standards.md'),
+    'el prompt de implement debe mandar a leer los estándares por ruta exacta, no de memoria'
+  );
+});
