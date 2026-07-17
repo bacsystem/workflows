@@ -53,6 +53,11 @@ Install it from this repo's self-hosted marketplace, inside Claude Code:
 Note: installing the plugin also exposes this repo's `commands/run-plan.md` as the
 `/cys:run-plan` slash command — no manual file copying needed.
 
+The plugin also ships `/cys:flow` — the all-in-one entry point: give it a
+target repo and an idea, and it walks the whole flow (design → plan →
+parallel run) with your approval gates at each stage. Use `/cys:run-plan`
+instead when an approved plan already exists.
+
 ## Requirements
 
 - **[Claude Code](https://claude.com/claude-code)**, with access to the `Workflow` tool.

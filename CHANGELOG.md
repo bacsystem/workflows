@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.2 — 2026-07-16
+
+New (cys F3 — see `docs/cys/specs/2026-07-16-cys-ecosystem-design.md`):
+
+- `/cys:flow` — the all-in-one plugin command: idea → `cys:design` →
+  `cys:plan` → parallel-plan-executor run, with user approval gates at
+  every stage. Zero-config via `${CLAUDE_PLUGIN_ROOT}`.
+- `skills/check/references/code-standards.md` — clean-code standards;
+  the engine's implement prompt now points agents at it by exact path.
+- Pilot 9 bitácora: F9 validated in production; F10 (consent-check
+  wording flagged as bypass) and F11 (classifier citing stale assistant
+  memory) documented with their fixes.
+- `tests/skills.test.js` now guards command frontmatter too.
+
 ## 0.6.1 — 2026-07-16
 
 New (cys F2 — see `docs/superpowers/specs/2026-07-16-cys-ecosystem-design.md`):

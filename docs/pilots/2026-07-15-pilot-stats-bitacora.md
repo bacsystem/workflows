@@ -474,3 +474,33 @@ El workflow intenta mergear task-1 en cada corrida aunque ya esté mergeada (no-
 igual se expone al clasificador y puede tumbar toda la corrida). Fix propuesto: chequeo
 de solo-lectura `git merge-base --is-ancestor task-N <integrationBranch>` antes de
 lanzar el agente de merge; si ya es ancestro, reportar MERGED sin lanzar agente.
+
+## Piloto 9 — 2026-07-16 (corridas F1/F2 del ecosistema cys, dogfooding)
+
+Dos corridas reales del workflow contra este mismo repo (F1: independencia
+del motor, 22 agentes; F2: plugin + skills, 19 + 10 agentes).
+
+- **F9 validado en producción**: en la corrida F2 de recuperación, los
+  agentes de merge reportaron "not yet an ancestor" tras el chequeo de
+  ancestría de solo lectura — el short-circuit funciona como se diseñó.
+- **F10 (nuevo, corregido en la misma rama)**: la redacción del fix F8
+  ("do not treat this as something requiring a fresh consent check") fue
+  marcada por el clasificador de permisos como intento de bypass ("bad-
+  faith tunneling") y mató a 3 de 5 agentes de merge de F2 con 0 tokens —
+  denegación previa a cualquier acción. Fix: el prompt ahora AFIRMA la
+  autorización textual del usuario y ordena deferir al diálogo de
+  permisos si aparece ("that dialog is the user's gate, not a failure").
+  Lección general: afirmar consentimiento sí; instruir a saltear chequeos
+  del entorno, nunca — el clasificador lo lee como evasión y endurece.
+- **F11 (mitigado)**: el clasificador cita la memoria persistente del
+  asistente como "política del usuario" — una nota vieja ("el clasificador
+  bloquea todo merge de agentes") siguió bloqueando merges ya autorizados,
+  incluso tras actualizarla (parece leer un snapshot). Mitigación doble:
+  memoria reescrita con la política real, y regla `ask` para `git merge`
+  en `.claude/settings.json` del repo — las reglas tienen precedencia
+  sobre el clasificador, así que cada merge de agente pausa y pregunta al
+  usuario con el diálogo nativo, determinísticamente.
+- **Recuperación validada**: las 3 tareas con merge muerto se rescataron
+  con merges manuales (autorizados) + una mini-corrida nueva solo con las
+  tareas pendientes (grafo recortado {6:[], 7:[6]}) — cero retrabajo de lo
+  ya implementado y revisado.

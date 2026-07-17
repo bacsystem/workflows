@@ -27,6 +27,9 @@ merge PRs.
 
 ## Rules
 
+- `/cys:flow <repo> <idea>` runs the whole flow end to end; `/cys:run-plan`
+  enters at stage 3 with an existing plan. Prefer them over improvising
+  the sequence.
 - If a cys skill applies to what you are about to do, invoke it BEFORE
   responding or acting — including before clarifying questions.
 - Enter the flow at the stage matching what already exists: no spec →
