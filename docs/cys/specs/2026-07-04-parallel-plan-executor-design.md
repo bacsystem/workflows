@@ -4,8 +4,8 @@
 
 ## 1. Contexto
 
-`superpowers:subagent-driven-development` ejecuta un plan de implementación (formato
-`superpowers:writing-plans`) tarea por tarea, en un solo hilo: cada tarea corre su propio
+Un ejecutor secuencial de planes de implementación (formato `cys:plan`) corre tarea por
+tarea, en un solo hilo: cada tarea corre su propio
 ciclo TDD (test → rojo → implementar → verde → commit) y espera revisión humana antes de
 pasar a la siguiente. Es correcto pero lento en tiempo de reloj cuando el plan tiene
 muchas tareas independientes entre sí (ej. el plan de 15 tareas de `business-core`, donde

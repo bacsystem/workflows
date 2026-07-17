@@ -65,7 +65,7 @@ prompt de `implement` debe ordenar crear un worktree propio del repo objetivo
 ### F4 — `task-brief` escribe el brief en el cwd del agente, no en el repo objetivo
 
 Consecuencia del mismo malentendido: para la task 4 el brief quedó en el worktree de la
-sesión (`workflows/.claude/worktrees/...`), no en `pilot-stats/.superpowers/sdd/`. La
+sesión (`workflows/.claude/worktrees/...`), no en `pilot-stats/.cys/`. La
 review lee el brief desde el repo objetivo — funcionó igual (el reviewer se adaptó), pero
 el contrato de paths entre implement y review es frágil. Mismo fix que F3: anclar el cwd
 del agente al repo objetivo.
@@ -125,7 +125,7 @@ F1/F3/F4/F5 (PR #9), para validación 1:1 contra el piloto 1.
 | Hallazgo | Resultado en el piloto 2 |
 |---|---|
 | **F3** (carrera de working tree) | ✅ Eliminada. Tareas 1 y 2 arrancaron con 3 s de diferencia, cada una en su worktree (`.worktrees/task-N`), commits en las ramas correctas desde el primer intento, `main` nunca se movió. |
-| **F4** (brief fuera del repo) | ✅ Briefs en `pilot-stats-2/.superpowers/sdd/`. |
+| **F4** (brief fuera del repo) | ✅ Briefs en `pilot-stats-2/.cys/`. |
 | **F5** (barra muda) | ✅ `Task N: started (implement)` visible al arrancar cada tarea. |
 | **F1** (CRLF del artefacto) | ✅ Lanzamiento a la primera, sin re-build manual. |
 

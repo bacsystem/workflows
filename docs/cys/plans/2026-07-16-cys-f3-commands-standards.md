@@ -17,7 +17,7 @@
 - All tests must pass: `npm test`.
 - Commit messages follow Conventional Commits, in English.
 - Command and reference content in English; only the bitácora entry is in Spanish (it joins an existing Spanish document).
-- The word "superpowers" must not be introduced anywhere.
+- No naming any external plugin this ecosystem replaced.
 - Do not chain shell commands with `&&`; one atomic command per invocation. Use `git -C <path>` instead of `cd`.
 
 ---

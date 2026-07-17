@@ -82,10 +82,10 @@ test('built workflow short-circuits merges of already-integrated branches (pilot
   );
 });
 
-test('built workflow has zero superpowers references and never scans the filesystem (cys F1)', () => {
+test('built workflow has zero external-plugin references and never scans the filesystem (cys F1)', () => {
   assert.ok(
-    !output.includes('superpowers'),
-    'ni skills, ni scripts, ni rutas .superpowers/sdd deben sobrevivir a F1'
+    !output.includes('subagent-driven-development'),
+    'ni skills, ni scripts, ni rutas del plugin externo deben sobrevivir a F1'
   );
   assert.ok(
     !output.includes('find ~') && !output.includes('FIND_SDD_SCRIPTS'),

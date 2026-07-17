@@ -1,6 +1,6 @@
 # cys F2 — Plugin and Skills Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship the cys plugin: installable manifest + self-hosted marketplace, the five skills (`ship` migrated from the author's git-flow skill; `design`, `plan`, `check`, `guide` written from scratch), and updated docs.
 
@@ -13,7 +13,7 @@
 - Node >= 20, `"type": "module"`, zero runtime dependencies.
 - All tests must pass: `npm test`.
 - Commit messages follow Conventional Commits, in English.
-- **Skills are written in English** (decision §10 of `docs/superpowers/specs/2026-07-16-cys-ecosystem-design.md`); READMEs are bilingual EN/ES.
+- **Skills are written in English** (decision §10 of `docs/cys/specs/2026-07-16-cys-ecosystem-design.md`); READMEs are bilingual EN/ES.
 - Skill/plugin names are kebab-case. The plugin is named exactly `cys`.
 - JSON paths always use forward slashes.
 - Do not chain shell commands with `&&`; one atomic command per invocation. Use `git -C <path>` instead of `cd`.
@@ -638,7 +638,7 @@ Apply to both (English in `README.md`, Spanish in `README.es.md`):
      ```
    - The skills table: `cys:design` (idea → spec), `cys:plan` (spec → plan), `cys:run` (the Workflow in this repo, launched via `/cys-run` or `commands/run-plan.md`), `cys:check` (adversarial review/verification), `cys:ship` (commit/SemVer/PR), `cys:guide` (index).
    - Note: installing the plugin also exposes this repo's `commands/run-plan.md` as `/cys:run-plan`.
-2. In the requirements section: superpowers is now needed **only** if you author plans with `superpowers:writing-plans` instead of `cys:plan`; the engine and the cys skills have no superpowers dependency.
+2. In the requirements section: an external plugin is now needed **only** if you author plans with an external plan-writing skill instead of `cys:plan`; the engine and the cys skills have no external plugin dependency.
 
 - [ ] **Step 3: Update `CHANGELOG.md` and bump the version**
 
@@ -647,7 +647,7 @@ Add at the top of `CHANGELOG.md`:
 ```markdown
 ## 0.6.1 — 2026-07-16
 
-New (cys F2 — see `docs/superpowers/specs/2026-07-16-cys-ecosystem-design.md`):
+New (cys F2 — see `docs/cys/specs/2026-07-16-cys-ecosystem-design.md`):
 
 - The **cys plugin**: `.claude-plugin/plugin.json` + self-hosted marketplace
   (`/plugin marketplace add bacsystem/parallel-plan-executor`, then
@@ -656,8 +656,8 @@ New (cys F2 — see `docs/superpowers/specs/2026-07-16-cys-ecosystem-design.md`)
   git-flow skill), `cys:design`, `cys:plan`, `cys:check`, `cys:guide`
   (written from scratch, English).
 - `tests/skills.test.js` guards manifests and SKILL.md frontmatter.
-- Docs: plugin install section (EN/ES); superpowers demoted from hard
-  requirement to optional (plan-authoring only).
+- Docs: plugin install section (EN/ES); the external plan-authoring
+  dependency demoted from hard requirement to optional (plan-authoring only).
 ```
 
 In `package.json`, change `"version": "0.6.0"` to `"version": "0.6.1"` (0.x rules: `feat` without breaking change → patch).

@@ -1,8 +1,8 @@
 # cys F1 — Engine Independence Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Remove the engine's runtime dependency on the superpowers plugin: own `task-brief`/`review-package` scripts invoked by exact path via a new `executorPath` arg, `.cys/` as the run-record directory, and no `FIND_SDD_SCRIPTS` filesystem scanning.
+**Goal:** Remove the engine's runtime dependency on an external plugin: own `task-brief`/`review-package` scripts invoked by exact path via a new `executorPath` arg, `.cys/` as the run-record directory, and no `FIND_SDD_SCRIPTS` filesystem scanning.
 
 **Architecture:** Two new pure-Node CLIs in `bin/` (reusing the tested plan parser), one new required workflow arg validated in `src/validate-args.js`, and a prompt rewrite in `workflows/parallel-plan-executor.template.js` (regenerated with `npm run build`). Docs and the `/run-plan` command follow.
 
@@ -15,7 +15,7 @@
 - All tests must pass: `npm test`.
 - Commit messages follow Conventional Commits.
 - Code comments follow the repo's style: Spanish for the "why" comments, matching the surrounding files.
-- The design spec for this work is `docs/superpowers/specs/2026-07-16-cys-ecosystem-design.md` (§5, fase F1).
+- The design spec for this work is `docs/cys/specs/2026-07-16-cys-ecosystem-design.md` (§5, fase F1).
 - Do not chain shell commands with `&&`; one atomic command per invocation. Use `git -C <path>` instead of `cd`.
 
 ---
@@ -180,7 +180,7 @@ if (block === null) {
 
 // Escribe directo en el outDir final (el .cys/ del repo destino): así el brief queda
 // donde el reviewer lo va a leer, sin el paso frágil de "copialo si quedó en otro lado"
-// que necesitaba el script de superpowers (piloto, hallazgo F4).
+// que necesitaba an external plugin's script (piloto, hallazgo F4).
 mkdirSync(outDir, { recursive: true });
 const briefPath = resolve(outDir, `task-${taskId}-brief.md`);
 writeFileSync(briefPath, block);
@@ -202,7 +202,7 @@ git add src/plan-parser.js bin/task-brief.js tests/task-brief.test.js
 ```
 
 ```bash
-git commit -m "feat(cys): add own task-brief CLI, replacing superpowers' script"
+git commit -m "feat(cys): add own task-brief CLI, replacing an external plugin's script"
 ```
 
 ---
@@ -353,7 +353,7 @@ git add bin/review-package.js tests/review-package.test.js
 ```
 
 ```bash
-git commit -m "feat(cys): add own review-package CLI, replacing superpowers' script"
+git commit -m "feat(cys): add own review-package CLI, replacing an external plugin's script"
 ```
 
 ---
@@ -428,7 +428,7 @@ git commit -m "feat(cys): require executorPath in workflow args"
 
 ---
 
-### Task 4: Template prompt rewrite — exact-path scripts, `.cys/`, no superpowers
+### Task 4: Template prompt rewrite — exact-path scripts, `.cys/`, no external-plugin references
 
 **Files:**
 - Modify: `workflows/parallel-plan-executor.template.js`
@@ -437,7 +437,7 @@ git commit -m "feat(cys): require executorPath in workflow args"
 
 **Interfaces:**
 - Consumes: the CLI `bin/task-brief.js` (from Task 1), the CLI `bin/review-package.js` (from Task 2), `validateWorkflowArgs` with required `executorPath` (from Task 3).
-- Produces: the regenerated `workflows/parallel-plan-executor.js` with zero superpowers references.
+- Produces: the regenerated `workflows/parallel-plan-executor.js` with zero external-plugin references.
 
 - [ ] **Step 1: Update the build tests (failing first)**
 
@@ -446,10 +446,10 @@ In `tests/build-workflow.test.js`:
 **(a) Replace** the test `built workflow scopes the SDD-scripts search instead of scanning the whole filesystem first (pilot 8, F7)` entirely with:
 
 ```js
-test('built workflow has zero superpowers references and never scans the filesystem (cys F1)', () => {
+test('built workflow has zero external-plugin references and never scans the filesystem (cys F1)', () => {
   assert.ok(
-    !output.includes('superpowers'),
-    'ni skills, ni scripts, ni rutas .superpowers/sdd deben sobrevivir a F1'
+    !output.includes('subagent-driven-development'),
+    'ni skills, ni scripts, ni rutas del plugin externo deben sobrevivir a F1'
   );
   assert.ok(
     !output.includes('find ~') && !output.includes('FIND_SDD_SCRIPTS'),
@@ -492,12 +492,12 @@ test('built workflow records the run under .cys/ in the target repo (cys F1)', (
   );
 ```
 
-**(e) Update** the test for the Handoff phase (`built workflow ships a Handoff phase...`): change the assertion `output.includes('.superpowers/sdd/handoff.md')` to `output.includes('.cys/handoff.md')`.
+**(e) Update** the test for the Handoff phase (`built workflow ships a Handoff phase...`): change the assertion `output.includes('external-plugin-path/handoff.md')` to `output.includes('.cys/handoff.md')`.
 
 - [ ] **Step 2: Run the build tests to verify they fail**
 
 Run: `node --test tests/build-workflow.test.js`
-Expected: FAIL — the template still references superpowers and `.superpowers/sdd/`.
+Expected: FAIL — the template still references the external plugin and its run-record path.
 
 - [ ] **Step 3: Rewrite the template**
 
@@ -519,15 +519,15 @@ validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr
 
 **(c) Delete the `FIND_SDD_SCRIPTS` constant entirely** (the comment block about F7 at lines 27-31 and the const at lines 32-38). The F7 story moves to the exact-path invocations below.
 
-**(d) Ledger** — in `appendLedger`, replace `.superpowers/sdd/progress.md` with `.cys/progress.md`.
+**(d) Ledger** — in `appendLedger`, replace the external plugin's `progress.md` path with `.cys/progress.md`.
 
 **(e) Implement prompt** — replace the two paragraphs
 
 ```
 `${FIND_SDD_SCRIPTS} Run: task-brief ${planPath} ${task.id} — it prints your brief ` +
 `file path. Read ONLY that brief file for your requirements, not the whole plan. If ` +
-`that brief file is not already under ${repoPath}/.superpowers/sdd/, copy it to ` +
-`${repoPath}/.superpowers/sdd/task-${task.id}-brief.md — the reviewer reads it from there.\n\n` +
+`that brief file is not already under ${repoPath}/.cys-legacy/, copy it to ` +
+`${repoPath}/.cys-legacy/task-${task.id}-brief.md — the reviewer reads it from there.\n\n` +
 ```
 
 with (the exact-path invocation kills F7 — no filesystem scanning — and writing straight into the target repo's `.cys/` kills the F4 copy step):
@@ -541,7 +541,7 @@ with (the exact-path invocation kills F7 — no filesystem scanning — and writ
 **(f) TDD instruction** in the implement prompt — replace
 
 ```
-`Follow superpowers:test-driven-development for every code change. Implement exactly ` +
+`Follow strict test-driven development for every code change. Implement exactly ` +
 ```
 
 with:
@@ -551,7 +551,7 @@ with:
 `first, run it and verify it fails, implement minimally, verify it passes. Implement exactly ` +
 ```
 
-**(g) Implementer report path** — replace `.superpowers/sdd/task-${task.id}-report.md` with `.cys/task-${task.id}-report.md`.
+**(g) Implementer report path** — replace the external plugin's report path with `.cys/task-${task.id}-report.md`.
 
 **(h) Review prompt** — replace
 
@@ -570,14 +570,14 @@ with:
 
 (The invocation must stay in ONE contiguous template literal — the build test asserts on that exact contiguous source text.)
 
-and replace `.superpowers/sdd/task-${task.id}-brief.md` with `.cys/task-${task.id}-brief.md` in the same prompt.
+and replace the external plugin's brief path with `.cys/task-${task.id}-brief.md` in the same prompt.
 
-**(i) Handoff prompt** — replace `${repoPath}/.superpowers/sdd/handoff.md` with `${repoPath}/.cys/handoff.md`.
+**(i) Handoff prompt** — replace the external plugin's handoff path with `${repoPath}/.cys/handoff.md`.
 
 **(j) Final review prompt** — replace
 
 ```
-`full plan at ${planPath} (use superpowers:requesting-code-review's code-reviewer ` +
+`full plan at ${planPath} (use a code-reviewer ` +
 `template). Check cross-task consistency the per-task reviews couldn't see.`,
 ```
 
@@ -597,9 +597,9 @@ Expected: `Built D:\github\workflows\workflows\parallel-plan-executor.js`
 - [ ] **Step 5: Run the full suite to verify everything passes**
 
 Run: `npm test`
-Expected: PASS — including the rewritten build tests; zero `superpowers` occurrences in the built output.
+Expected: PASS — including the rewritten build tests; zero external-plugin references in the built output.
 
-If the zero-superpowers assertion fails because a Spanish "why" comment in an inlined `src/` module mentions superpowers, reword that comment (keep its meaning, drop the word) and re-run `npm run build` — comments are part of the built output.
+If the zero-external-plugin-reference assertion fails because a Spanish "why" comment in an inlined `src/` module mentions it, reword that comment (keep its meaning, drop the word) and re-run `npm run build` — comments are part of the built output.
 
 - [ ] **Step 6: Commit**
 
@@ -611,8 +611,8 @@ git add workflows/parallel-plan-executor.template.js workflows/parallel-plan-exe
 git commit -m "feat(cys)!: run own bin/ scripts by exact path and record runs under .cys/
 
 BREAKING CHANGE: args.executorPath is now required; the run-record
-directory moved from .superpowers/sdd/ to .cys/. The engine no longer
-locates or runs superpowers' task-brief/review-package scripts."
+directory moved from the external plugin's convention to .cys/. The engine no longer
+locates or runs an external plugin's task-brief/review-package scripts."
 ```
 
 ---
@@ -644,14 +644,14 @@ In the launch step (step 6, "Launch"), the `args` list currently reads `{ tasks,
 
 Apply the same three edits to both files (English wording in `README.md`, Spanish in `README.es.md`):
 
-1. Replace every occurrence of `.superpowers/sdd/handoff.md` and `.superpowers/sdd/` with `.cys/handoff.md` / `.cys/` respectively.
+1. Replace every occurrence of the external plugin's run-record paths with `.cys/handoff.md` / `.cys/` respectively.
 2. In the "Uso" / "Usage" args example, add after the `integrationBranch` line:
    ```
    #            executorPath: "<este-repo>",              # ruta absoluta de este clon: el workflow
    #                                                      # corre sus scripts bin/ por ruta exacta (obligatorio)
    ```
    (English: `# absolute path of this clone: the workflow runs its bin/ scripts by exact path (required)`.)
-3. In the requirements section, soften the superpowers bullet: it is no longer needed by the *engine* (the workflow now ships its own `task-brief`/`review-package` in `bin/` and records runs under `.cys/`); it is still required today for **writing plans** (`superpowers:writing-plans`) until cys ships its own design/plan skills (see the cys design spec, fase F2). Keep the rest of the bullet.
+3. In the requirements section, soften the external-plugin-dependency bullet: it is no longer needed by the *engine* (the workflow now ships its own `task-brief`/`review-package` in `bin/` and records runs under `.cys/`); it is still required today for **writing plans** (the external plan-writing skill) until cys ships its own design/plan skills (see the cys design spec, fase F2). Keep the rest of the bullet.
 
 - [ ] **Step 3: Update `CHANGELOG.md` and bump the version**
 
@@ -664,15 +664,15 @@ Add at the top of `CHANGELOG.md`:
 
 - `args.executorPath` is now required: the absolute path of this clone. The
   implement/review prompts invoke `bin/task-brief.js` and `bin/review-package.js`
-  by exact path — no more locating superpowers' scripts by scanning the
+  by exact path — no more locating an external plugin's scripts by scanning the
   filesystem (kills pilot finding F7 at the root; F4's copy step is gone too,
   the brief is written straight into the target repo).
-- The run record moved from `.superpowers/sdd/` to `.cys/` (progress.md ledger,
+- The run record moved from the external plugin's convention to `.cys/` (progress.md ledger,
   task briefs/reports, review packages, handoff.md).
-- The engine no longer depends on the superpowers plugin at runtime.
-  `superpowers:writing-plans` is still the plan format source until cys F2.
+- The engine no longer depends on any external plugin at runtime.
+  An external plan-writing skill is still the plan format source until cys F2.
 
-New (cys F1 — see `docs/superpowers/specs/2026-07-16-cys-ecosystem-design.md`):
+New (cys F1 — see `docs/cys/specs/2026-07-16-cys-ecosystem-design.md`):
 
 - `bin/task-brief.js <plan> <taskId> <outDir>` — extracts one task's block.
 - `bin/review-package.js <repo> <base> <head> <outDir>` — commit list + stat + diff.
