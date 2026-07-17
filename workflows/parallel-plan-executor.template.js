@@ -115,7 +115,7 @@ function settle(taskId, label) {
   if (settledTasks.has(taskId)) return;
   settledTasks.add(taskId);
   settledCount += 1;
-  log(`${progressBar()} — Task ${taskId} ${label}`);
+  log(`${progressBar()} — Task ${taskId} (branch task-${taskId}) ${label}`);
 }
 
 // agent() devuelve null si el usuario saltea el agente o si murió por un error terminal
@@ -260,7 +260,7 @@ async function executeTask(taskId) {
   const task = tasksById.get(taskId);
   // Señal de vida al arrancar (piloto, hallazgo F5): la barra solo se emite al settle,
   // así que sin esto el primer implement largo transcurre en silencio total.
-  log(`Task ${taskId}: started (implement)`);
+  log(`Task ${taskId}: started (implement) on branch task-${taskId}`);
   let impl = ensureAgentResult(taskId, await implement(task), 'implementer');
   await assertNotBlocked(taskId, impl);
 

@@ -192,6 +192,17 @@ test('built workflow logs task start so long implement phases show life (pilot F
   );
 });
 
+test('built workflow names the branch in progress logs, not just the task id', () => {
+  assert.ok(
+    output.includes('started (implement) on branch task-${taskId}'),
+    'el aviso de inicio debe nombrar la rama task-N para que el usuario sepa dónde mirar'
+  );
+  assert.ok(
+    output.includes('(branch task-${taskId})'),
+    'la línea de settle (done/failed/skipped) también debe nombrar la rama'
+  );
+});
+
 test('built workflow returns failure causes as messages, not raw Error objects (pilot 2/5)', () => {
   assert.ok(
     output.includes('r.error?.message ?? String(r.error)') &&
