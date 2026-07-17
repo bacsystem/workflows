@@ -41,6 +41,17 @@ Install it from this repo's self-hosted marketplace, inside Claude Code:
 /plugin install cys@bacsystem
 ```
 
+The first line resolves the short `owner/repo` GitHub form. Two equivalent
+alternatives, if you need them:
+
+```
+# Full GitHub URL instead of the short form
+/plugin marketplace add https://github.com/bacsystem/parallel-plan-executor
+
+# A local clone instead of GitHub (e.g. to test uncommitted changes)
+/plugin marketplace add /absolute/path/to/your/clone
+```
+
 | Skill | What it does |
 |---|---|
 | `cys:design` | idea → spec |
@@ -52,6 +63,11 @@ Install it from this repo's self-hosted marketplace, inside Claude Code:
 
 Note: installing the plugin also exposes this repo's `commands/run-plan.md` as the
 `/cys:run-plan` slash command — no manual file copying needed.
+
+The plugin also ships `/cys:flow` — the all-in-one entry point: give it a
+target repo and an idea, and it walks the whole flow (design → plan →
+parallel run) with your approval gates at each stage. Use `/cys:run-plan`
+instead when an approved plan already exists.
 
 ## Requirements
 
@@ -331,7 +347,7 @@ Point `integrationBranch` at an **ephemeral feature branch cut from `develop`** 
 at `develop`/`main` directly:
 
 ```
-master (release)                 ← never touched by agents
+main (release)                   ← never touched by agents
   └── develop (integration)     ← never touched by agents
         └── feature/<plan>      ← integrationBranch: task branches merge here ★
               ├── task-1        ← one isolated worktree per implementer

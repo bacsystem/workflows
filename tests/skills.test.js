@@ -63,3 +63,15 @@ test('cada skill existente tiene SKILL.md con frontmatter name/description váli
     assert.ok(fm.description && fm.description.length >= 20, 'la description guía la invocación: no puede ser vacía ni trivial');
   }
 });
+
+test('cada comando del plugin tiene frontmatter con description', () => {
+  const commandsDir = path.join(root, 'commands');
+  const files = readdirSync(commandsDir).filter((f) => f.endsWith('.md'));
+  assert.ok(files.includes('flow.md'), 'el comando /cys:flow debe existir');
+  assert.ok(files.includes('run-plan.md'), 'el comando /cys:run-plan debe existir');
+  for (const file of files) {
+    const fm = parseFrontmatter(readFileSync(path.join(commandsDir, file), 'utf8'));
+    assert.ok(fm, `commands/${file} necesita frontmatter ---`);
+    assert.ok(fm.description && fm.description.length >= 20, `commands/${file}: la description guía la invocación`);
+  }
+});

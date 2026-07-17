@@ -82,10 +82,10 @@ test('built workflow short-circuits merges of already-integrated branches (pilot
   );
 });
 
-test('built workflow has zero superpowers references and never scans the filesystem (cys F1)', () => {
+test('built workflow has zero external-plugin references and never scans the filesystem (cys F1)', () => {
   assert.ok(
-    !output.includes('superpowers'),
-    'ni skills, ni scripts, ni rutas .superpowers/sdd deben sobrevivir a F1'
+    !output.includes('subagent-driven-development'),
+    'ni skills, ni scripts, ni rutas del plugin externo deben sobrevivir a F1'
   );
   assert.ok(
     !output.includes('find ~') && !output.includes('FIND_SDD_SCRIPTS'),
@@ -240,4 +240,12 @@ test('built workflow settles every terminal branch and reconciles the progress b
   assert.ok(output.includes('function settle('), 'progress accounting must be centralized in a settle() helper');
   assert.ok(output.includes("settle(taskId, 'FAILED (review)')"), 'the review-failed-after-fix branch must count as settled');
   assert.ok(output.includes('settledCount = results.size'), 'skipped tasks must be reconciled after runDag');
+});
+
+test('built workflow points both implementers and reviewers at the code-standards reference (cys F3, review final finding #1)', () => {
+  assert.equal(
+    (output.match(/\$\{executorPath\}\/skills\/check\/references\/code-standards\.md/g) ?? []).length,
+    2,
+    'el documento dice "reviewers hold implementations to them" — debe citarse en implement() Y en review(), no solo en implement()'
+  );
 });

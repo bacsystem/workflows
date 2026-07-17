@@ -14,7 +14,7 @@ Five stages, five skills — each stage's output is the next stage's input.
 |---|---|---|
 | 1. Design | `cys:design` | idea → approved spec (`docs/cys/specs/`) |
 | 2. Plan | `cys:plan` | spec → parser-ready plan (`docs/cys/plans/`) |
-| 3. Run | `cys:run` — the parallel-plan-executor Workflow (`/cys:run-plan`) | plan → implemented, reviewed, merged task branches |
+| 3. Run | `cys:run` — the parallel-plan-executor Workflow (`/cys:run-plan`, or `/cys:flow` from an idea) | plan → implemented, reviewed, merged task branches |
 | 4. Check | `cys:check` | change → verdicts (spec PASS/FAIL + quality APPROVED/NEEDS_FIXES) |
 | 5. Ship | `cys:ship` | working tree → Conventional Commit, SemVer bump, PR |
 
@@ -27,6 +27,9 @@ merge PRs.
 
 ## Rules
 
+- `/cys:flow <repo> <idea>` runs the whole flow end to end; `/cys:run-plan`
+  enters at stage 3 with an existing plan. Prefer them over improvising
+  the sequence.
 - If a cys skill applies to what you are about to do, invoke it BEFORE
   responding or acting — including before clarifying questions.
 - Enter the flow at the stage matching what already exists: no spec →

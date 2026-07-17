@@ -154,6 +154,9 @@ async function implement(task) {
     `Run: \`node ${executorPath}/bin/task-brief.js ${planPath} ${task.id} ${repoPath}/.cys\` — ` +
     `it prints your brief file path, already inside the target repo where the reviewer will ` +
     `read it. Read ONLY that brief file for your requirements, not the whole plan.\n\n` +
+    `Also read ${executorPath}/skills/check/references/code-standards.md once before writing ` +
+    `any code — it binds HOW you implement (naming, unit size, YAGNI, comments, test hygiene) ` +
+    `and your self-review checks against it.\n\n` +
     `Read the "## Global Constraints" section from ${planPath} yourself — it binds this task.\n\n` +
     `Your very first action overall: run \`date +%H:%M:%S\` and report that value as ` +
     `startedAt; run it again right before reporting and use it as finishedAt.\n\n` +
@@ -184,6 +187,8 @@ async function review(task, impl) {
     `implementer's report at ${impl.reportFile}. Treat the report as unverified claims — ` +
     `verify against the diff.\n\n` +
     `Read the "## Global Constraints" section from ${planPath} yourself — it binds this task.\n\n` +
+    `Also read ${executorPath}/skills/check/references/code-standards.md once — code-quality ` +
+    `findings below are held to it (naming, unit size, YAGNI, dead code, comments, test hygiene).\n\n` +
     `Report: Part 1 spec compliance (Missing/Extra/Misunderstood, file:line) — verdict PASS ` +
     `or FAIL. Part 2 code quality (Critical/Important/Minor findings, file:line) — verdict ` +
     `APPROVED or NEEDS_FIXES. Findings text goes in "findings"; both verdicts are required ` +

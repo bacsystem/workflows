@@ -1,6 +1,6 @@
 # parallel-plan-executor Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a reusable, technology-agnostic Claude Code Workflow script that executes
 a `writing-plans`-formatted implementation plan, running independent tasks in parallel via
@@ -34,7 +34,7 @@ artifact must be one self-contained file) producing `workflows/parallel-plan-exe
 - No runtime dependencies (YAGNI) — only Node's built-ins, matching the zero-dependency
   precedent already set by `git-flow`'s `next-version.sh`.
 - Every parser/graph/scheduler module is tested against both a synthetic fixture AND a
-  real excerpt of `business-core`'s actual plan (`D:\github\business-core\docs\superpowers\plans\2026-07-04-core-implementation.md`), per the design spec's requirement to validate against a real plan, not only synthetic ones.
+  real excerpt of `business-core`'s actual plan (`D:\github\business-core\docs\plans\2026-07-04-core-implementation.md`), per the design spec's requirement to validate against a real plan, not only synthetic ones.
 
 ---
 
@@ -183,7 +183,7 @@ git commit -m "chore: scaffold repo with Node test runner"
 
 Copy the first two task blocks (Task 1 and Task 3, which really do declare
 `Produces: httpserver.NewRouter() *chi.Mux` and consume it) from
-`D:\github\business-core\docs\superpowers\plans\2026-07-04-core-implementation.md`
+`D:\github\business-core\docs\plans\2026-07-04-core-implementation.md`
 into `tests/fixtures/business-core-excerpt.md` verbatim (same `**Files:**`/`**Interfaces:**`
 structure, real project, not invented) — read the source file and copy Task 1's full
 block plus Task 5's `**Interfaces:**` block (which consumes `module.Module` produced
@@ -737,10 +737,11 @@ Expected: FAIL — `scripts/build-workflow.js` does not exist
 
 - [ ] **Step 3: Write minimal implementation**
 
-This reuses the real `superpowers:subagent-driven-development` machinery (not an ad-hoc
-reimplementation): each task-agent runs that skill's own `scripts/task-brief` and
-`scripts/review-package` via Bash, and the implementer/reviewer prompts are condensed
-versions of that skill's `implementer-prompt.md`/`task-reviewer-prompt.md` templates —
+This reuses real task-orchestration machinery from an external skill plugin available
+at the time (not an ad-hoc reimplementation): each task-agent runs that skill's own
+`scripts/task-brief` and `scripts/review-package` via Bash, and the implementer/reviewer
+prompts are condensed versions of that skill's `implementer-prompt.md`/
+`task-reviewer-prompt.md` templates —
 same two-verdict review contract, same DONE/DONE_WITH_CONCERNS/BLOCKED/NEEDS_CONTEXT
 status contract, same progress ledger. Two adaptations, because a `Workflow` cannot pause
 mid-run for a human the way the main loop does:
@@ -756,7 +757,7 @@ mid-run for a human the way the main loop does:
 ```js
 export const meta = {
   name: 'parallel-plan-executor',
-  description: 'Execute a writing-plans implementation plan with independent tasks run in parallel via a dependency DAG, reusing subagent-driven-development\'s task-brief/review-package/ledger machinery',
+  description: 'Execute an implementation plan with independent tasks run in parallel via a dependency DAG, reusing task-brief/review-package/ledger machinery',
   phases: [
     { title: 'Implement' },
     { title: 'Review' },
@@ -771,9 +772,9 @@ const { graph, tasks, planPath, repoPath } = args;
 const tasksById = new Map(tasks.map((t) => [t.id, t]));
 
 const FIND_SDD_SCRIPTS =
-  'Locate the superpowers:subagent-driven-development skill\'s scripts directory — search ' +
+  'Locate an external plugin\'s task-orchestration scripts directory — search ' +
   'under the Claude Code plugin cache for a path ending in ' +
-  '"subagent-driven-development/scripts" (it contains task-brief and review-package).';
+  '"scripts" that contains task-brief and review-package.';
 
 const IMPLEMENTER_SCHEMA = {
   type: 'object',
@@ -819,7 +820,7 @@ const REVIEWER_SCHEMA = {
 
 function appendLedger(line) {
   return agent(
-    `In repo ${repoPath}, append this exact line to .superpowers/sdd/progress.md ` +
+    `In repo ${repoPath}, append this exact line to the run's progress ledger ` +
     `(create the file and its directory if missing): "${line}"`,
     { label: 'ledger', phase: 'Merge' }
   );
@@ -852,11 +853,11 @@ async function implement(task) {
     `it again right before reporting and use it as finishedAt.\n\n` +
     `Before starting: create and switch to branch task-${task.id} (a fixed, predictable ` +
     `name so a later fix round can find it), then record its parent commit SHA as baseSha.\n\n` +
-    `Follow superpowers:test-driven-development for every code change. Implement exactly ` +
+    `Follow strict test-driven development for every code change. Implement exactly ` +
     `what the brief specifies, write tests, verify RED then GREEN, commit, then self-review ` +
     `(completeness, quality, YAGNI discipline, test hygiene) before reporting.\n\n` +
     `Write your full report (what you built, TDD evidence, files changed, self-review ` +
-    `findings) to .superpowers/sdd/task-${task.id}-report.md in repo ${repoPath}, then ` +
+    `findings) to the run's report path for this task in repo ${repoPath}, then ` +
     `record HEAD's SHA as headSha and report back via the required fields. Use BLOCKED or ` +
     `NEEDS_CONTEXT if you cannot proceed — there is no one to ask mid-run, so describe ` +
     `exactly what's missing in "concerns"; it will be resolved after this run, not now.`,
@@ -870,7 +871,7 @@ async function review(task, impl) {
     `is a task-scoped gate (spec compliance + code quality), not a merge review.\n\n` +
     `${FIND_SDD_SCRIPTS} Run: review-package ${impl.baseSha} ${impl.headSha} — it prints a ` +
     `diff package file. Read that file once; it is your view of the change, do not re-run git.\n\n` +
-    `Read the task brief already written at .superpowers/sdd/task-${task.id}-brief.md and the ` +
+    `Read the task brief already written at the run's brief path for this task and the ` +
     `implementer's report at ${impl.reportFile}. Treat the report as unverified claims — ` +
     `verify against the diff.\n\n` +
     `Read the "## Global Constraints" section from ${planPath} yourself — it binds this task.\n\n` +
@@ -947,7 +948,7 @@ let finalReview = null;
 if (mergedCount > 0) {
   finalReview = await agent(
     `Do a broad whole-branch review of repo ${repoPath}'s integration branch against the ` +
-    `full plan at ${planPath} (use superpowers:requesting-code-review's code-reviewer ` +
+    `full plan at ${planPath} (use a code-reviewer ` +
     `template). Check cross-task consistency the per-task reviews couldn't see.`,
     { label: 'final-review', phase: 'Final review', effort: 'high' }
   );
@@ -1029,12 +1030,12 @@ git commit -m "feat: assemble the final Workflow script from the tested schedule
 ```markdown
 # parallel-plan-executor
 
-A technology-agnostic Claude Code `Workflow` that executes a `superpowers:writing-plans`
+A technology-agnostic Claude Code `Workflow` that executes a plan-writing skill's
 implementation plan, running independent tasks in parallel via a dependency DAG inferred
-from each task's `Consumes`/`Produces` block — instead of one task at a time like
-`superpowers:subagent-driven-development` does by default.
+from each task's `Consumes`/`Produces` block — instead of one task at a time like a
+sequential task-execution skill does by default.
 
-Design spec: `docs/superpowers/specs/2026-07-04-parallel-plan-executor-design.md`.
+Design spec: `docs/cys/specs/2026-07-04-parallel-plan-executor-design.md`.
 
 ## How it works
 
