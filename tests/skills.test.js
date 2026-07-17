@@ -34,6 +34,15 @@ test('marketplace.json se autohospeda apuntando a la raíz del repo', () => {
   assert.equal(market.plugins[0].source, './');
 });
 
+test('el set de skills v1 del plugin está completo', () => {
+  const expected = ['check', 'design', 'guide', 'plan', 'ship'];
+  const actual = readdirSync(skillsDir, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
+    .sort();
+  assert.deepEqual(actual, expected);
+});
+
 test('cada skill existente tiene SKILL.md con frontmatter name/description válidos', () => {
   if (!existsSync(skillsDir)) return; // aún sin skills: las tareas 2-6 las agregan
   for (const dir of readdirSync(skillsDir, { withFileTypes: true })) {

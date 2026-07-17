@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.1 — 2026-07-16
+
+New (cys F2 — see `docs/superpowers/specs/2026-07-16-cys-ecosystem-design.md`):
+
+- The **cys plugin**: `.claude-plugin/plugin.json` + self-hosted marketplace
+  (`/plugin marketplace add bacsystem/parallel-plan-executor`, then
+  `/plugin install cys@bacsystem`).
+- Five skills under `skills/`: `cys:ship` (migrated from the author's
+  git-flow skill), `cys:design`, `cys:plan`, `cys:check`, `cys:guide`
+  (written from scratch, English).
+- `tests/skills.test.js` guards manifests and SKILL.md frontmatter.
+- Docs: plugin install section (EN/ES); superpowers demoted from hard
+  requirement to optional (plan-authoring only).
+
 ## 0.6.0 — 2026-07-16
 
 **BREAKING** (0.x → minor per git-flow rules):

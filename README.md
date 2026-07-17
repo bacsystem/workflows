@@ -25,7 +25,33 @@ different from plugins and skills:
   (`scriptPath: <clone>/workflows/parallel-plan-executor.js`) when you ask it to.
 
 The only piece of it that gets "installed" in the Claude Code sense is the optional
-`/run-plan` slash command (a single `.md` file you copy — see below).
+`/run-plan` slash command (a single `.md` file you copy — see below), or the **cys
+plugin** described next.
+
+## The cys plugin
+
+**cys** is this repo's skill plugin: five skills covering the whole flow
+**design → plan → run → check → ship**, named after the author's twin daughters,
+**Cielo y Sophia**.
+
+Install it from this repo's self-hosted marketplace, inside Claude Code:
+
+```
+/plugin marketplace add bacsystem/parallel-plan-executor
+/plugin install cys@bacsystem
+```
+
+| Skill | What it does |
+|---|---|
+| `cys:design` | idea → spec |
+| `cys:plan` | spec → implementation plan |
+| `cys:run` | the Workflow in this repo — launched via `/cys-run` or `commands/run-plan.md` |
+| `cys:check` | adversarial review / verification |
+| `cys:ship` | commit / SemVer bump / PR |
+| `cys:guide` | index — which skill to use when |
+
+Note: installing the plugin also exposes this repo's `commands/run-plan.md` as the
+`/cys:run-plan` slash command — no manual file copying needed.
 
 ## Requirements
 
@@ -36,12 +62,11 @@ The only piece of it that gets "installed" in the Claude Code sense is the optio
   assistant (ChatGPT, Gemini, etc.) can interpret. What *is* agnostic is the **target
   project** being automated: it can be Go, Node, Java, or whatever stack the plan
   describes.
-- **The [superpowers](https://github.com/anthropics/claude-plugins) plugin, installed in
-  Claude Code.** The *engine* no longer needs it: the workflow now ships its own
-  `task-brief`/`review-package` scripts in `bin/` and records runs under `.cys/`. It is
-  still required today for **writing plans** (`superpowers:writing-plans`) until cys
-  ships its own design/plan skills (see the cys design spec, fase F2). Installing this
-  repo does **not** install superpowers for you — do it first (see Installation, step 0).
+- **The [superpowers](https://github.com/anthropics/claude-plugins) plugin — optional.**
+  You only need it if you author your plans with `superpowers:writing-plans` instead of
+  `cys:plan`. The engine and the cys skills have **no** superpowers dependency: the
+  workflow ships its own `task-brief`/`review-package` scripts in `bin/` and records
+  runs under `.cys/`.
 - **Node.js >= 20** (for `bin/parse-plan.js` and the test suite — no runtime
   dependencies, just standard Node).
 - Git, and a clean working tree in the project you're automating.
@@ -51,10 +76,9 @@ The only piece of it that gets "installed" in the Claude Code sense is the optio
 ## Installation
 
 ```bash
-# 0. Inside Claude Code, install the superpowers plugin if you don't have it yet:
+# 0. (Optional) Inside Claude Code, install the superpowers plugin — only needed
+#    if you'll author plans with superpowers:writing-plans instead of cys:plan:
 #    type /plugin, open the marketplace, and install "superpowers".
-#    Verify: the skill listing should show superpowers:writing-plans,
-#    superpowers:subagent-driven-development, etc.
 
 # 1. Clone this repo (where the workflow lives) onto your machine.
 #    WHERE: anywhere you like — your home folder, a tools directory, etc.
