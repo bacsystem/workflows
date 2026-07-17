@@ -1,0 +1,11 @@
+{
+  "name": "bacsystem",
+  "owner": { "name": "bacsystem" },
+  "plugins": [
+    {
+      "name": "cys",
+      "source": "./",
+      "description": "Development methodology skills with parallel plan execution: design, plan, run, check, ship."
+    }
+  ]
+}
