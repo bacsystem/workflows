@@ -26,7 +26,7 @@ test('build script embeds the args validation and the template invokes it before
   assert.ok(output.includes('function assertAcyclic('));
   assert.ok(!output.includes('__VALIDATION_SOURCE__'));
   assert.ok(!output.includes('import '), 'the built file must be self-contained, no imports');
-  const validateIndex = output.indexOf('validateWorkflowArgs({ tasks, graph, integrationBranch, openPr, pr, mergeAuthorization })');
+  const validateIndex = output.indexOf('validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization })');
   assert.ok(validateIndex >= 0, 'the template must invoke validateWorkflowArgs with integrationBranch');
   assert.ok(
     validateIndex < output.indexOf('agent('),
@@ -43,8 +43,8 @@ test('built workflow tolerates args delivered as a JSON string (real harness beh
 
 test('built workflow names the integration branch explicitly instead of letting agents guess', () => {
   assert.ok(
-    output.includes('integrationBranch, openPr, pr, mergeAuthorization } = resolvedArgs'),
-    'integrationBranch debe venir de los args resueltos (objeto o string parseado)'
+    output.includes('integrationBranch, executorPath, openPr, pr, mergeAuthorization } = resolvedArgs'),
+    'integrationBranch y executorPath deben venir de los args resueltos (objeto o string parseado)'
   );
   assert.ok(
     output.includes('into branch ${integrationBranch}'),
@@ -82,14 +82,22 @@ test('built workflow short-circuits merges of already-integrated branches (pilot
   );
 });
 
-test('built workflow scopes the SDD-scripts search instead of scanning the whole filesystem first (pilot 8, F7)', () => {
+test('built workflow has zero superpowers references and never scans the filesystem (cys F1)', () => {
   assert.ok(
-    output.includes('Try first, scoped'),
-    'debe existir la instrucción de acotar la búsqueda al home del usuario'
+    !output.includes('superpowers'),
+    'ni skills, ni scripts, ni rutas .superpowers/sdd deben sobrevivir a F1'
   );
   assert.ok(
-    output.includes('find ~ -ipath'),
-    'el primer intento debe ser un find acotado al home, no `find /`'
+    !output.includes('find ~') && !output.includes('FIND_SDD_SCRIPTS'),
+    'los scripts se invocan por ruta exacta; el escaneo de disco (F7) muere de raíz'
+  );
+  assert.ok(
+    output.includes('node ${executorPath}/bin/task-brief.js ${planPath} ${task.id} ${repoPath}/.cys'),
+    'el implementador corre task-brief propio por ruta exacta, escribiendo directo en .cys del repo destino'
+  );
+  assert.ok(
+    output.includes('node ${executorPath}/bin/review-package.js ${repoPath} ${impl.baseSha} ${impl.headSha} ${repoPath}/.cys'),
+    'el reviewer corre review-package propio por ruta exacta'
   );
 });
 
@@ -170,12 +178,11 @@ test('built workflow gives each implementer its own worktree of the TARGET repo 
   );
 });
 
-test('built workflow makes sure the task brief lands in the target repo (pilot F4)', () => {
-  assert.ok(
-    output.includes('copy it to') &&
-      output.includes('${repoPath}/.superpowers/sdd/task-${task.id}-brief.md'),
-    'task-brief escribe en el cwd del agente; el implement debe garantizar el brief bajo repoPath'
-  );
+test('built workflow records the run under .cys/ in the target repo (cys F1)', () => {
+  assert.ok(output.includes('.cys/progress.md'), 'el ledger vive en .cys');
+  assert.ok(output.includes('.cys/task-${task.id}-brief.md'), 'el brief se lee desde .cys');
+  assert.ok(output.includes('.cys/task-${task.id}-report.md'), 'el reporte del implementador va a .cys');
+  assert.ok(output.includes('.cys/handoff.md'), 'el handoff va a .cys');
 });
 
 test('built workflow logs task start so long implement phases show life (pilot F5)', () => {
@@ -205,7 +212,7 @@ test('built workflow ships a Handoff phase that prepares the git-flow handoff (v
     'handoff solo corre si algo mergeó (mismo gate que la review final)'
   );
   assert.ok(
-    output.includes('.superpowers/sdd/handoff.md'),
+    output.includes('.cys/handoff.md'),
     'el entregable es un handoff.md en el repo objetivo'
   );
   assert.ok(

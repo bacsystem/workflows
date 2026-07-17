@@ -1,6 +1,6 @@
 export const meta = {
   name: 'parallel-plan-executor',
-  description: 'Execute a writing-plans implementation plan with independent tasks run in parallel via a dependency DAG, reusing subagent-driven-development\'s task-brief/review-package/ledger machinery',
+  description: 'Execute an implementation plan with independent tasks run in parallel via a dependency DAG: per-task briefs, adversarial review, serialized merges, git-flow handoff',
   phases: [
     { title: 'Implement' },
     { title: 'Review' },
@@ -20,22 +20,9 @@ export const meta = {
 // invocado la tool (comprobado en el piloto 2026-07-15): destructurar el string daba
 // tasks undefined y un error que culpaba al campo equivocado.
 const resolvedArgs = typeof args === 'string' ? JSON.parse(args) : args;
-const { graph, tasks, planPath, repoPath, integrationBranch, openPr, pr, mergeAuthorization } = resolvedArgs;
-validateWorkflowArgs({ tasks, graph, integrationBranch, openPr, pr, mergeAuthorization }); // falla rápido y claro, nunca deadlock
+const { graph, tasks, planPath, repoPath, integrationBranch, executorPath, openPr, pr, mergeAuthorization } = resolvedArgs;
+validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization }); // falla rápido y claro, nunca deadlock
 const tasksById = new Map(tasks.map((t) => [t.id, t]));
-
-// Piloto 2026-07-16, hallazgo F7: la primera redacción mandaba a cada agente a correr
-// `find /` (todo el disco) como primer intento — en Windows/Git Bash eso no termina en
-// el timeout de 120s del harness y se va solo a segundo plano. Cada agente (implement Y
-// review, uno por tarea) repetía el mismo escaneo desde cero. Ahora el primer intento es
-// acotado al home del usuario; `find /` queda solo como último recurso.
-const FIND_SDD_SCRIPTS =
-  'Locate the superpowers:subagent-driven-development skill\'s scripts directory: it lives ' +
-  'under the Claude Code plugin cache, in a path ending "subagent-driven-development/scripts" ' +
-  '(contains task-brief and review-package). Try first, scoped to the user\'s home directory ' +
-  '(e.g. `find ~ -ipath "*subagent-driven-development*" 2>/dev/null` or an equivalent Glob ' +
-  'anchored there) — do NOT start with a whole-filesystem `find /`; only fall back to that ' +
-  'if the scoped search truly finds nothing.';
 
 const IMPLEMENTER_SCHEMA = {
   type: 'object',
@@ -90,7 +77,7 @@ function appendLedger(line) {
   // <line></line> porque incluye texto libre de otros agentes (concerns, findings) —
   // una comilla en ese texto rompía el framing del prompt.
   return enqueueMainRepo(() => agent(
-    `In repo ${repoPath}, append to .superpowers/sdd/progress.md (create the file and ` +
+    `In repo ${repoPath}, append to .cys/progress.md (create the file and ` +
     `its directory if missing) exactly the single line between the <line> tags below, ` +
     `without the tags:\n<line>${line}</line>`,
     { label: 'ledger', phase: 'Merge' }
@@ -164,18 +151,18 @@ async function implement(task) {
     `-b task-${task.id}\` (fixed, predictable branch name so a later fix round can find ` +
     `it), then do ALL your work — edits, tests, commits — inside ${worktreeDir}. Record ` +
     `that worktree's initial HEAD SHA as baseSha.\n\n` +
-    `${FIND_SDD_SCRIPTS} Run: task-brief ${planPath} ${task.id} — it prints your brief ` +
-    `file path. Read ONLY that brief file for your requirements, not the whole plan. If ` +
-    `that brief file is not already under ${repoPath}/.superpowers/sdd/, copy it to ` +
-    `${repoPath}/.superpowers/sdd/task-${task.id}-brief.md — the reviewer reads it from there.\n\n` +
+    `Run: \`node ${executorPath}/bin/task-brief.js ${planPath} ${task.id} ${repoPath}/.cys\` — ` +
+    `it prints your brief file path, already inside the target repo where the reviewer will ` +
+    `read it. Read ONLY that brief file for your requirements, not the whole plan.\n\n` +
     `Read the "## Global Constraints" section from ${planPath} yourself — it binds this task.\n\n` +
     `Your very first action overall: run \`date +%H:%M:%S\` and report that value as ` +
     `startedAt; run it again right before reporting and use it as finishedAt.\n\n` +
-    `Follow superpowers:test-driven-development for every code change. Implement exactly ` +
+    `Follow strict test-driven development for every code change: write the failing test ` +
+    `first, run it and verify it fails, implement minimally, verify it passes. Implement exactly ` +
     `what the brief specifies, write tests, verify RED then GREEN, commit, then self-review ` +
     `(completeness, quality, YAGNI discipline, test hygiene) before reporting.\n\n` +
     `Write your full report (what you built, TDD evidence, files changed, self-review ` +
-    `findings) to .superpowers/sdd/task-${task.id}-report.md in repo ${repoPath} (the main ` +
+    `findings) to .cys/task-${task.id}-report.md in repo ${repoPath} (the main ` +
     `repo, not your worktree), record HEAD's SHA as headSha, then release your worktree: ` +
     `run \`git -C ${repoPath} worktree remove --force ${worktreeDir}\` — your branch and ` +
     `commits remain, and this frees task-${task.id} for a potential fix round. Report back ` +
@@ -190,9 +177,10 @@ async function review(task, impl) {
   return agent(
     `You are reviewing Task ${task.id}: "${task.title}" from the plan at ${planPath}. This ` +
     `is a task-scoped gate (spec compliance + code quality), not a merge review.\n\n` +
-    `${FIND_SDD_SCRIPTS} Run: review-package ${impl.baseSha} ${impl.headSha} — it prints a ` +
-    `diff package file. Read that file once; it is your view of the change, do not re-run git.\n\n` +
-    `Read the task brief already written at .superpowers/sdd/task-${task.id}-brief.md and the ` +
+    `Run: \`node ${executorPath}/bin/review-package.js ${repoPath} ${impl.baseSha} ${impl.headSha} ${repoPath}/.cys\` — ` +
+    `it prints a diff package file. Read that file once; it is your view ` +
+    `of the change, do not re-run git.\n\n` +
+    `Read the task brief already written at .cys/task-${task.id}-brief.md and the ` +
     `implementer's report at ${impl.reportFile}. Treat the report as unverified claims — ` +
     `verify against the diff.\n\n` +
     `Read the "## Global Constraints" section from ${planPath} yourself — it binds this task.\n\n` +
@@ -232,7 +220,7 @@ async function handoff(finalReview) {
     `commits and the commits they brought in. Derive the dominant Conventional ` +
     `Commit type and propose a SemVer bump per git-flow rules (>=1.0: feat=minor, fix=patch, ` +
     `BREAKING=major; 0.x: BREAKING=minor, everything else=patch). Report it as versionBump.\n\n` +
-    `2. Write ${repoPath}/.superpowers/sdd/handoff.md containing: a suggested PR title ` +
+    `2. Write ${repoPath}/.cys/handoff.md containing: a suggested PR title ` +
     `(Conventional Commit subject covering the run), a PR body with Summary / Type of change / ` +
     `Main changes (one bullet per task) / Version / Checklist sections, the final review ` +
     `verdict quoted below, and a post-run cleanup checklist (merged task-N branches to delete, ` +
@@ -347,8 +335,9 @@ let handoffResult = null;
 if (mergedCount > 0) {
   finalReview = await agent(
     `Do a broad whole-branch review of repo ${repoPath}'s \`${integrationBranch}\` branch against the ` +
-    `full plan at ${planPath} (use superpowers:requesting-code-review's code-reviewer ` +
-    `template). Check cross-task consistency the per-task reviews couldn't see.`,
+    `full plan at ${planPath}. Structure it as: Strengths / Issues (Critical, Important, ` +
+    `Minor — each with file:line) / Recommendations / Assessment ("Ready to merge? yes/no" ` +
+    `with reasoning). Check cross-task consistency the per-task reviews couldn't see.`,
     { label: 'final-review', phase: 'Final review', effort: 'high' }
   );
   handoffResult = await handoff(finalReview);
