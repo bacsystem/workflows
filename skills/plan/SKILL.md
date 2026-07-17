@@ -23,7 +23,7 @@ Every plan MUST start with:
     # [Feature Name] Implementation Plan
 
     > **For agentic workers:** execute this plan with the
-    > parallel-plan-executor Workflow (cys:run / the /cys-run command).
+    > parallel-plan-executor Workflow (cys:run / the /cys:run-plan command).
     > Steps use checkbox (`- [ ]`) syntax for tracking.
 
     **Goal:** [one sentence]
@@ -92,5 +92,5 @@ Each step is one 2-5 minute action, with complete content — never
 ## Hand off
 
 After saving the plan, hand off to execution: launch with cys:run
-(or tell the user to run /cys-run). Do NOT offer sequential execution
+(or tell the user to run /cys:run-plan). Do NOT offer sequential execution
 paths — parallel execution via the DAG is the cys default.

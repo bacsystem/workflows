@@ -44,7 +44,7 @@ Se instala desde el marketplace autohospedado de este repo, dentro de Claude Cod
 |---|---|
 | `cys:design` | idea → spec |
 | `cys:plan` | spec → plan de implementación |
-| `cys:run` | el Workflow de este repo — se lanza vía `/cys-run` o `commands/run-plan.md` |
+| `cys:run` | el Workflow de este repo — se lanza vía `/cys:run-plan` o `commands/run-plan.md` |
 | `cys:check` | revisión adversarial / verificación |
 | `cys:ship` | commit / bump de SemVer / PR |
 | `cys:guide` | índice — qué skill usar en cada momento |

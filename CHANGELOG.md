@@ -19,6 +19,23 @@ New (cys F2 — see `docs/superpowers/specs/2026-07-16-cys-ecosystem-design.md`)
 - Docs: plugin install section (EN/ES); superpowers demoted from hard
   requirement to optional (plan-authoring only).
 
+Fixed (out-of-plan, same branch):
+
+- `fix(merge)` F10: the merge prompt now affirms the user's authorization
+  without instructing agents to skip consent checks — the previous F8
+  wording was flagged by the permission classifier as a bypass attempt and
+  killed 3 of 5 merge agents mid-run.
+- Project `ask` permission rule for `git merge` in `.claude/settings.json`:
+  agent merges pause for the user's dialog click instead of being judged
+  by the automatic classifier.
+- `.gitignore` now covers `.cys/` run records and `.worktrees/`.
+- Post-review polish: `skills/ship/README.md` rewritten for its cys:ship
+  identity (plugin install, no symlink/auto-tag instructions), `/cys-run`
+  references corrected to the real `/cys:run-plan`, `commands/run-plan.md`
+  defaults REPO to `${CLAUDE_PLUGIN_ROOT}` (zero-config as a plugin
+  command), and `tests/skills.test.js` pins plugin.json version to
+  package.json.
+
 ## 0.6.0 — 2026-07-16
 
 **BREAKING** (0.x → minor per git-flow rules):

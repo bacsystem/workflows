@@ -26,6 +26,14 @@ test('plugin.json declara el plugin cys con los campos mínimos', () => {
   assert.ok(manifest.description && manifest.description.length > 0);
 });
 
+test('la versión del plugin está sincronizada con package.json', () => {
+  // Sin este candado, el próximo bump de package.json deja plugin.json atrás en silencio
+  // (hallazgo de la review final de F2).
+  const manifest = JSON.parse(readFileSync(path.join(root, '.claude-plugin', 'plugin.json'), 'utf8'));
+  const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
+  assert.equal(manifest.version, pkg.version);
+});
+
 test('marketplace.json se autohospeda apuntando a la raíz del repo', () => {
   const market = JSON.parse(readFileSync(path.join(root, '.claude-plugin', 'marketplace.json'), 'utf8'));
   assert.equal(market.name, 'bacsystem');

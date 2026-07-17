@@ -1,9 +1,13 @@
-# git-flow
+# cys:ship
 
 A Claude Code skill that takes changes from the working tree to a pull request,
 following consistent conventions: branch naming, code review, Conventional
 Commits, automatic SemVer, and a PR template. It is **guided, not blind** — it
 pauses for your confirmation at the review, doc-update, and PR steps.
+
+Part of the [cys plugin](../../README.md): the last stage of the flow
+design → plan → run → check → **ship**. Migrated from the author's standalone
+git-flow skill; behavior is unchanged.
 
 ## How to use it
 
@@ -12,7 +16,7 @@ There are three ways to trigger the skill:
 **1. Explicit slash command** — most direct:
 
 ```
-/git-flow
+/cys:ship
 ```
 
 **2. Natural language** — Claude activates it from the skill description:
@@ -55,20 +59,6 @@ PR), pausing for your confirmation at the review, doc-update, and PR steps.
 | Version source | `package.json` → `VERSION` → `git tag` → `CHANGELOG.md` |
 | PR | Via `gh`, asks before creating |
 
-## Tagging
-
-This repository ships an [`auto-tag` workflow](../.github/workflows/auto-tag.yml)
-that reads the latest version from `CHANGELOG.md` and creates the matching
-`vX.Y.Z` tag when changes land on `main`.
-
-> **Heads-up:** the workflow only runs where GitHub Actions is enabled. While
-> Actions is unavailable (e.g. an org with billing disabled), the tag is **not**
-> created automatically — tag manually after merge:
->
-> ```bash
-> git tag -a vX.Y.Z -m "vX.Y.Z" && git push <remote> vX.Y.Z
-> ```
-
 ## Files
 
 - [`SKILL.md`](./SKILL.md) — the full skill definition (the authoritative spec).
@@ -79,11 +69,11 @@ that reads the latest version from `CHANGELOG.md` and creates the matching
 
 ## Installation
 
-Symlink the skill into your personal skills directory so repo edits apply
-immediately:
+Installed automatically with the cys plugin:
 
-```bash
-ln -snf "$(pwd)/git-flow" ~/.claude/skills/git-flow
+```
+/plugin marketplace add bacsystem/parallel-plan-executor
+/plugin install cys@bacsystem
 ```
 
-Then start a new Claude Code session and use `/git-flow`.
+Then start a new Claude Code session and use `/cys:ship`.

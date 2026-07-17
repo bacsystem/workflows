@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Compute the next SemVer version from a current version and a Conventional
 # Commit type. Pure: no files, no network, no state. Stdout = new version.
-# Spec: docs/superpowers/specs/2026-06-05-next-version-script-design.md
+# Origin: migrated from the author's standalone git-flow skill (bacsystem/skills).
 set -euo pipefail
 
 usage() {

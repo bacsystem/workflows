@@ -45,7 +45,7 @@ Install it from this repo's self-hosted marketplace, inside Claude Code:
 |---|---|
 | `cys:design` | idea → spec |
 | `cys:plan` | spec → implementation plan |
-| `cys:run` | the Workflow in this repo — launched via `/cys-run` or `commands/run-plan.md` |
+| `cys:run` | the Workflow in this repo — launched via `/cys:run-plan` or `commands/run-plan.md` |
 | `cys:check` | adversarial review / verification |
 | `cys:ship` | commit / SemVer bump / PR |
 | `cys:guide` | index — which skill to use when |

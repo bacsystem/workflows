@@ -1,4 +1,4 @@
-<!-- PR template for the git-flow skill. Fill in and use as the `gh pr create` body. Written in English. -->
+<!-- PR template for the cys:ship skill. Fill in and use as the `gh pr create` body. Written in English. -->
 
 ## Summary
 

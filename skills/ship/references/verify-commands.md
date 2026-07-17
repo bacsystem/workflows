@@ -1,4 +1,4 @@
-<!-- Verify-step reference for the git-flow skill. Detect the ecosystem, run the
+<!-- Verify-step reference for the cys:ship skill. Detect the ecosystem, run the
 matching test/lint command, and STOP if it fails. Prefer a command already
 defined by the project (scripts, Makefile targets, CI) over a generic guess.
 If none of these markers exist, the project has no verifiable setup — say so and
