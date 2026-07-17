@@ -152,7 +152,7 @@ human gate moves to the final PR review).
 
 1. `bin/parse-plan.js` reads a plan file and computes its task list + dependency graph
    (pure Node, fully unit tested — see `tests/`).
-2. `workflows/parallel-plan-executor.js` (built from `workflows/parallel-plan-executor.template.js`
+2. `workflows/parallel-plan-executor.js` (built from `workflows-src/parallel-plan-executor.template.js`
    via `npm run build`) takes that graph and runs each task in its own git worktree via
    `agent()`, starting a task the moment its specific dependencies finish rather than
    waiting for a whole batch.
