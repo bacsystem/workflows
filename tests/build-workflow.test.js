@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -258,5 +258,16 @@ test('built workflow points both implementers and reviewers at the code-standard
     (output.match(/\$\{executorPath\}\/skills\/check\/references\/code-standards\.md/g) ?? []).length,
     2,
     'el documento dice "reviewers hold implementations to them" — debe citarse en implement() Y en review(), no solo en implement()'
+  );
+});
+
+test('el template vive fuera de workflows/, para no duplicarse en el listado de skills del plugin (Fase 4a fix 2)', () => {
+  assert.ok(
+    existsSync(path.join(root, 'workflows-src', 'parallel-plan-executor.template.js')),
+    'el template debe existir en workflows-src/'
+  );
+  assert.ok(
+    !existsSync(path.join(root, 'workflows', 'parallel-plan-executor.template.js')),
+    'workflows/ no debe tener ningún archivo con export const meta además del generado — causa raíz confirmada del duplicado cys:parallel-plan-executor en el listado de skills'
   );
 });
