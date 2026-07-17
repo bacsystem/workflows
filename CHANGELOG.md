@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.4 — 2026-07-17
+
+Fixed (Fase 4a — see `docs/cys/specs/2026-07-17-fase-4a-quick-fixes-design.md`):
+
+- `/cys:flow` and `/cys:run-plan` now create the integration branch from
+  `develop` if it doesn't already exist, right before launching. Both
+  commands previously assumed it existed — a missing branch made the
+  first task's merge fail with a confusing "not a valid object name"
+  error, found live during the cys independence-proof smoke test.
+- The workflow template moved from `workflows/` to `workflows-src/` —
+  `cys:parallel-plan-executor` was appearing twice in the installed
+  plugin's skill listing because `workflows/` held two files carrying an
+  identical `Workflow`-tool `meta` block (the hand-edited template and
+  the generated artifact); `workflows/` now holds only the generated file.
+
 ## 0.6.3 — 2026-07-17
 
 Changed:

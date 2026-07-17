@@ -154,7 +154,7 @@ Si prefieres que no te pregunte nunca, usa `"allow"` en vez de `"ask"` (la corri
 1. `bin/parse-plan.js` lee un archivo de plan y calcula la lista de tareas + el grafo de
    dependencias (Node puro, con tests unitarios completos — ver `tests/`).
 2. `workflows/parallel-plan-executor.js` (generado a partir de
-   `workflows/parallel-plan-executor.template.js` con `npm run build`) toma ese grafo y
+   `workflows-src/parallel-plan-executor.template.js` con `npm run build`) toma ese grafo y
    corre cada tarea en su propio worktree de git vía `agent()`, arrancando una tarea en
    cuanto sus dependencias específicas terminan, sin esperar a un lote completo.
 3. Cada tarea pasa por un agente de revisión adversarial en vez de un checkpoint humano

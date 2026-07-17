@@ -56,13 +56,20 @@ REPO = `${CLAUDE_PLUGIN_ROOT}`
    openPr/PR settings, and confirm the authorization text with the user. This is a real
    run against their repo — don't skip the confirmation.
 
-6. **Launch**: invoke the `Workflow` tool with:
+6. **Create the integration branch if it doesn't exist**: run
+   `git -C <repo-path> show-ref --verify --quiet
+   refs/heads/<integration-branch>`. If it exits non-zero, create it from `develop`:
+   `git -C <repo-path> branch <integration-branch> develop`. If
+   it exits 0, the branch already exists — step 2's sanity check already
+   covers its naming, nothing more to do here.
+
+7. **Launch**: invoke the `Workflow` tool with:
    - `scriptPath`: `<REPO>/workflows/parallel-plan-executor.js`
    - `args`: `{ tasks, graph, planPath, repoPath, integrationBranch, executorPath: <REPO>, openPr, pr, mergeAuthorization }`
      (executorPath is REPO — the workflow invokes REPO/bin scripts by exact path;
      omit `openPr`/`pr`/`mergeAuthorization` if not provided)
 
-7. **After launching**: tell the user it's running in the background, mention they can
+8. **After launching**: tell the user it's running in the background, mention they can
    ask "how's the workflow going?" any time or open `/workflows`, and that you'll report
    back when it finishes or if a merge needs authorization.
 

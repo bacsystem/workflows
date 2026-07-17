@@ -64,6 +64,17 @@ test('cada skill existente tiene SKILL.md con frontmatter name/description váli
   }
 });
 
+test('los comandos crean la integrationBranch desde develop si no existe antes de lanzar (Fase 4a fix 1)', () => {
+  const flow = readFileSync(path.join(root, 'commands', 'flow.md'), 'utf8');
+  const runPlan = readFileSync(path.join(root, 'commands', 'run-plan.md'), 'utf8');
+  for (const [name, content] of [['flow.md', flow], ['run-plan.md', runPlan]]) {
+    assert.ok(
+      content.includes('create it from `develop`'),
+      `commands/${name} debe crear la rama de integración desde develop si no existe (antes solo cubría el caso "ya existe")`
+    );
+  }
+});
+
 test('cada comando del plugin tiene frontmatter con description', () => {
   const commandsDir = path.join(root, 'commands');
   const files = readdirSync(commandsDir).filter((f) => f.endsWith('.md'));

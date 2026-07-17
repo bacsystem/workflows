@@ -18,7 +18,7 @@ const validationSource = [
   inlineModule('src', 'validate-args.js'),
 ].join('\n');
 
-const templatePath = path.join(root, 'workflows', 'parallel-plan-executor.template.js');
+const templatePath = path.join(root, 'workflows-src', 'parallel-plan-executor.template.js');
 // El template también se normaliza a LF para que el artefacto sea determinista sin
 // importar los finales de línea del working copy.
 let output = readFileSync(templatePath, 'utf8').replace(/\r\n/g, '\n');

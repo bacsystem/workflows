@@ -65,13 +65,20 @@ REPO = `${CLAUDE_PLUGIN_ROOT}`
    Re-check the working tree is still clean; if the integration branch
    already exists, ask whether to continue on it or pick another name.
 
-8. **Launch** the `Workflow` tool with:
+8. **Create the integration branch if it doesn't exist**: run
+   `git -C <repo-path> show-ref --verify --quiet
+   refs/heads/<integration-branch>`. If it exits non-zero, create it from `develop`:
+   `git -C <repo-path> branch <integration-branch> develop`. If
+   it exits 0, the branch already exists — step 7 already handled
+   confirming that with the user, nothing more to do here.
+
+9. **Launch** the `Workflow` tool with:
    - `scriptPath`: `REPO/workflows/parallel-plan-executor.js`
    - `args`: `{ tasks, graph, planPath, repoPath, integrationBranch,
      executorPath: REPO, openPr, pr, mergeAuthorization }` (omit the
      optional ones not provided).
 
-9. **After launching**: tell the user it runs in the background, that
+10. **After launching**: tell the user it runs in the background, that
    they can ask "how's the workflow going?" or open `/workflows`, and
    that merges may pause for their permission dialog — a click there is
    expected, not a failure.
