@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.3 — 2026-07-17
+
+Changed:
+
+- Progress log lines now name the `task-N` branch explicitly: `Task N:
+  started (implement) on branch task-N`, and the settle line reads
+  `... — Task N (branch task-N) <label>`. Found useful during the cys
+  independence-proof smoke test (first real run against a plugin
+  installed from GitHub) — following a run across worktrees or `git log`
+  was one mental hop harder without it.
+
 ## 0.6.2 — 2026-07-17
 
 New (cys F3 — see `docs/cys/specs/2026-07-16-cys-ecosystem-design.md`):
