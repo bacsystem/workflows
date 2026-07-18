@@ -331,6 +331,7 @@ const HANDOFF_SCHEMA = {
     handoffFile: { type: 'string' },
     versionBump: { type: 'string', description: 'proposed SemVer bump per git-flow rules, e.g. "patch -> 1.2.4" or "minor (0.x breaking) -> 0.5.0"' },
     prUrl: { type: 'string', description: 'URL of the created PR, only when openPr was requested and succeeded' },
+    pendingLogged: { type: 'number', description: 'count of unresolved review findings appended to .cys/pending.md' },
     detail: { type: 'string' },
   },
   required: ['handoffFile'],
@@ -497,14 +498,22 @@ async function handoff(finalReview) {
     `Main changes (one bullet per task) / Version / Checklist sections, the final review ` +
     `verdict quoted below, and a post-run cleanup checklist (merged task-N branches to delete, ` +
     `what to do with ${integrationBranch} after the PR merges). Report its path as handoffFile.\n\n` +
+    `3. Classify every finding in the final review above that is still unresolved (Minor ` +
+    `findings are expected to stay open; also include any Important/Critical finding the user ` +
+    `explicitly chose not to fix). For each: append one line to ${repoPath}/.cys/pending.md, ` +
+    `under "## Bugs" for broken/incorrect behavior or "## Gaps" for missing/deferred scope — ` +
+    `create the file first with this exact skeleton if it does not exist yet:\n` +
+    `"# Pendientes\\n\\n## Bugs\\n\\n## Gaps\\n\\n## Tareas\\n". Keep the finding's own wording ` +
+    `and file:line reference; never touch "## Tareas". Report how many items you appended as ` +
+    `pendingLogged (0 if every finding was already resolved).\n\n` +
     (wantPr
-      ? `3. Push ${integrationBranch} to the remote and create the pull request: ` +
+      ? `4. Push ${integrationBranch} to the remote and create the pull request: ` +
         `\`gh pr create --base ${prArgs.base ?? 'develop'} --head ${integrationBranch}\` with the ` +
         `title and body from handoff.md, applying these fields when present: ` +
         `${JSON.stringify(prArgs)} (assignees, labels, milestone; put "Closes #<closes>" in the ` +
         `body when closes is set). Do NOT merge the PR — that gate is human. Report its URL as ` +
         `prUrl. If there is no remote or gh fails, do not retry destructively: explain in "detail".\n\n`
-      : `3. Do NOT push and do NOT create any PR (openPr was not requested). Note in "detail" ` +
+      : `4. Do NOT push and do NOT create any PR (openPr was not requested). Note in "detail" ` +
         `that the branch is ready for a manual git-flow handoff.\n\n`) +
     `Final whole-branch review verdict:\n<review>${finalReview ?? 'final review was not run'}</review>`,
     { label: 'handoff', phase: 'Handoff', schema: HANDOFF_SCHEMA }
@@ -631,7 +640,8 @@ if (mergedCount > 0) {
   if (handoffResult) {
     log(`Handoff listo: ${handoffResult.handoffFile}` +
       (handoffResult.versionBump ? ` — bump propuesto: ${handoffResult.versionBump}` : '') +
-      (handoffResult.prUrl ? ` — PR: ${handoffResult.prUrl}` : ''));
+      (handoffResult.prUrl ? ` — PR: ${handoffResult.prUrl}` : '') +
+      (handoffResult.pendingLogged ? ` — ${handoffResult.pendingLogged} pendiente(s) agregado(s) a .cys/pending.md` : ''));
   } else {
     log('Handoff: el agente no devolvió resultado (salteado o error terminal); la rama queda lista para handoff manual');
   }
