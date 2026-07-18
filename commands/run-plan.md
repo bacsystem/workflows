@@ -100,6 +100,37 @@ REPO = `${CLAUDE_PLUGIN_ROOT}`
    ask "how's the workflow going?" any time or open `/workflows`, and that you'll report
    back when it finishes or if a merge needs authorization.
 
+10. **Offer the manual retry guide** (skip entirely if `allDone` was
+    `true` — the run finishes immediately, nothing to resume): ask one
+    question, in plain language — whether they want the copy-paste text
+    for a Claude Code Desktop Local Routine that resumes this run
+    unattended if it gets cut short. On "no", stop here. On "yes", print
+    this block, filling in this run's own already-known values (no new
+    questions):
+
+    ```
+    Name: cys auto-retry — <plan or integration-branch slug>
+
+    Instructions:
+    Check whether <repo-path>/.cys/state.json exists. If it does not
+    exist, do nothing and finish immediately.
+    If it exists, resume the interrupted cys run: invoke
+    /cys:run-plan <plan-path> <repo-path> <integration-branch>.
+    When asked whether to open a PR, answer <this run's openPr/pr.base>.
+    When asked for merge authorization, say you don't have one this time
+    — let any merge pause for the user's own permission click.
+
+    Suggested schedule: every 15 minutes
+    Folder: <repo-path>
+    ```
+
+    Tell them where to paste it: Claude Code Desktop → Routines → New
+    routine → Local (or describe the same thing conversationally to
+    Claude in a Desktop session, which walks through the same form).
+    Remind them to delete or disable the Routine once the run finishes
+    or once they no longer need it — there is no way for it to clean
+    itself up yet.
+
 ## Notes
 
 - This command only *launches* the run — treat "how's it going" follow-ups as fresh

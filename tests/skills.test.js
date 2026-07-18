@@ -139,3 +139,16 @@ test('check documenta que un hallazgo diferido se registra en .cys/pending.md', 
     'cys:check debe anotar en .cys/pending.md los hallazgos que el usuario decide no corregir ahora'
   );
 });
+
+test('run-plan.md y flow.md ofrecen el texto de reintento manual (Routine Local) al terminar de lanzar (Fase 4c)', () => {
+  const runPlan = readFileSync(path.join(root, 'commands', 'run-plan.md'), 'utf8');
+  const flow = readFileSync(path.join(root, 'commands', 'flow.md'), 'utf8');
+  for (const [name, content] of [['run-plan.md', runPlan], ['flow.md', flow]]) {
+    assert.ok(
+      content.includes('Desktop Local Routine') &&
+        content.includes('Check whether <repo-path>/.cys/state.json exists') &&
+        content.includes("don't have one this time"),
+      `commands/${name} debe ofrecer el texto de reintento manual, chequear .cys/state.json y no dar autorización de merge en el prompt generado`
+    );
+  }
+});
