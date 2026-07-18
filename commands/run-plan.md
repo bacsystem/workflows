@@ -85,9 +85,15 @@ REPO = `${CLAUDE_PLUGIN_ROOT}`
    was `true` — the branch already has everything merged on it): run
    `git -C <repo-path> show-ref --verify --quiet
    refs/heads/<integration-branch>`. If it exits non-zero, create it from `develop`:
-   `git -C <repo-path> branch <integration-branch> develop`. If
+   `git -C <repo-path> branch --no-track <integration-branch> develop`. If
    it exits 0, the branch already exists — step 3's sanity check already
    covers its naming, nothing more to do here.
+   `--no-track` matters: if the target repo has no local `develop` (only
+   `origin/develop`), git resolves `develop` against the remote-tracking
+   branch and, without `--no-track`, sets the new branch's upstream to
+   `origin/develop` by default — a later `git push` with no explicit
+   refspec from that branch would push straight to `develop`. Reported by
+   a real user who hit exactly this.
 
 8. **Launch**: invoke the `Workflow` tool with:
    - `scriptPath`: `<REPO>/workflows/parallel-plan-executor.js`

@@ -75,6 +75,18 @@ test('los comandos crean la integrationBranch desde develop si no existe antes d
   }
 });
 
+test('los comandos crean la integrationBranch con --no-track, para no heredar el upstream de origin/develop en silencio (hallazgo real de persons-crud)', () => {
+  const flow = readFileSync(path.join(root, 'commands', 'flow.md'), 'utf8');
+  const runPlan = readFileSync(path.join(root, 'commands', 'run-plan.md'), 'utf8');
+  for (const [name, content] of [['flow.md', flow], ['run-plan.md', runPlan]]) {
+    assert.ok(
+      content.includes('branch --no-track <integration-branch> develop'),
+      `commands/${name}: sin --no-track, si solo existe origin/develop (no develop local), git resuelve la rama y ` +
+        `por defecto le pone el tracking apuntando a origin/develop — un push sin refspec explícito empujaría ahí`
+    );
+  }
+});
+
 test('los comandos detectan .cys/state.json de una corrida interrumpida (Fase 4b)', () => {
   const flow = readFileSync(path.join(root, 'commands', 'flow.md'), 'utf8');
   const runPlan = readFileSync(path.join(root, 'commands', 'run-plan.md'), 'utf8');
@@ -195,5 +207,21 @@ test('plan exige forzar mecánicamente una versión de lenguaje/runtime fijada e
   assert.ok(
     plan.includes('Version/toolchain enforcement'),
     'cys:plan debe exigir que una versión fijada en Global Constraints quede forzada mecánicamente, no solo declarada'
+  );
+});
+
+test('plan exige revisar las aristas reales del grafo en el dry-run, no confiar solo en "warnings": [] (hallazgo real de persons-crud)', () => {
+  const plan = readFileSync(path.join(skillsDir, 'plan', 'SKILL.md'), 'utf8');
+  assert.ok(
+    plan.includes('An empty warnings array is not proof the graph is right'),
+    'cys:plan debe advertir explícitamente que un array de warnings vacío no prueba que el grafo esté bien'
+  );
+});
+
+test('design exige verificar empíricamente restricciones de entorno en vez de heredarlas de un spec/pilot anterior (hallazgo real de persons-crud: Docker asumido bloqueado sin chequear)', () => {
+  const design = readFileSync(path.join(skillsDir, 'design', 'SKILL.md'), 'utf8');
+  assert.ok(
+    design.includes('Environment-dependent constraints are verified, not inherited'),
+    'cys:design debe exigir verificar restricciones de entorno en vez de heredarlas de otro spec/pilot'
   );
 });

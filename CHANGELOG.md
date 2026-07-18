@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.11 — 2026-07-18
+
+Fixed — second retrospective from the Persons CRUD pilot:
+
+- `commands/flow.md` / `commands/run-plan.md`: creating the integration
+  branch now uses `git branch --no-track <integration-branch> develop`.
+  Without `--no-track`, if the target repo has no local `develop` (only
+  `origin/develop`), git resolves `develop` against the remote-tracking
+  branch and sets the new branch's upstream to `origin/develop` by
+  default — a later `git push` with no explicit refspec from that branch
+  would push straight to `develop`. Reported by a real user who hit
+  exactly this and had to `--unset-upstream` by hand.
+
+New:
+
+- `cys:plan`'s "Parser dry-run" self-review step now explicitly requires
+  checking every edge of the printed `graph` against the DAG you
+  designed — an empty `warnings` array is not proof the graph is right,
+  only that the parser didn't flag anything.
+- `cys:design` gained a principle: environment-dependent constraints
+  (blocked binaries, no Docker, etc.) must be verified empirically for
+  the current project, not inherited from a different prior spec/pilot.
+  Found live: a Java/Spring pilot inherited "Docker probably doesn't
+  work" from an unrelated Go pilot's spec without checking — Docker was
+  actually available, and the resulting mocks-only test strategy missed
+  a real bug (`GlobalExceptionHandler` swallowing exceptions) that only
+  an integration test against a real MongoDB could have caught.
+
 ## 0.6.10 — 2026-07-18
 
 New — retrospective from the Persons CRUD pilot (Spring Boot/MongoDB, run

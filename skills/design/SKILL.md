@@ -49,6 +49,12 @@ This applies to every project, no matter how simple it looks.
   boundaries.
 - In existing codebases, follow the established patterns; propose targeted
   improvements only where existing problems block the current work.
+- Environment-dependent constraints are verified, not inherited. A prior
+  spec's finding about this sandbox (a blocked binary, no Docker, etc.)
+  does not automatically apply to a different stack or a later run —
+  check it empirically for this project (e.g. `docker info`, whether the
+  relevant binary/service actually responds) before letting it drive a
+  decision like "tests can only use mocks."
 
 ## Red flags — you are skipping the process
 
