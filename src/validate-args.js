@@ -4,9 +4,16 @@ import { assertAcyclic, assertUniqueTaskIds } from './graph-builder.js';
 // un ciclo en ese grafo deja a runDag esperando su propia promesa memoizada para
 // siempre — deadlock sin error ni log. Esta validación corre antes de lanzar cualquier
 // agente para que el fallo sea inmediato y explicable.
-export function validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization }) {
-  if (!Array.isArray(tasks) || tasks.length === 0) {
-    throw new Error('args.tasks must be a non-empty array');
+export function validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly }) {
+  if (finishOnly !== undefined && typeof finishOnly !== 'boolean') {
+    throw new Error('args.finishOnly must be a boolean when present');
+  }
+  if (!Array.isArray(tasks) || (tasks.length === 0 && !finishOnly)) {
+    // finishOnly: true es la única excepción a "no vacío" — bin/plan-remainder.js marca
+    // allDone cuando ya no queda ninguna tarea pendiente/fallida (todo se mergeó antes de
+    // que la corrida se cortara) y solo falta terminar la revisión final + el handoff.
+    // Final review, hallazgo Important #2.
+    throw new Error('args.tasks must be a non-empty array (unless args.finishOnly is true)');
   }
   if (!graph || typeof graph !== 'object') {
     throw new Error('args.graph must be an object');

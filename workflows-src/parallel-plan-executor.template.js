@@ -20,9 +20,38 @@ export const meta = {
 // invocado la tool (comprobado en el piloto 2026-07-15): destructurar el string daba
 // tasks undefined y un error que culpaba al campo equivocado.
 const resolvedArgs = typeof args === 'string' ? JSON.parse(args) : args;
-const { graph, tasks, planPath, repoPath, integrationBranch, executorPath, openPr, pr, mergeAuthorization } = resolvedArgs;
-validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization }); // falla rápido y claro, nunca deadlock
+const { graph, tasks, planPath, repoPath, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly } = resolvedArgs;
+validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly }); // falla rápido y claro, nunca deadlock
 const tasksById = new Map(tasks.map((t) => [t.id, t]));
+
+// Fase 4b: snapshot completo del estado de cada tarea, para que una sesión futura (no
+// solo el caché same-session de resumeFromRunId) pueda detectar una corrida cortada y
+// recuperar solo lo pendiente. Arranca en 'pending' para todas; se actualiza en cada
+// settle() y el archivo se borra al llegar al final natural del script.
+const taskStates = new Map(tasks.map((t) => [t.id, { status: 'pending' }]));
+
+function stateJson() {
+  const tasksObj = {};
+  for (const [id, entry] of taskStates) tasksObj[id] = entry;
+  return JSON.stringify({ planPath, repoPath, integrationBranch, tasks: tasksObj }, null, 2);
+}
+
+function writeState() {
+  return enqueueMainRepo(() => agent(
+    `In repo ${repoPath}, write exactly this content to .cys/state.json (create the file ` +
+    `and its directory if missing), overwriting anything already there. Write only the ` +
+    `content between the <content> tags below, without the tags:\n<content>${stateJson()}</content>`,
+    { label: 'state', phase: 'Merge' }
+  ));
+}
+
+function deleteState() {
+  return enqueueMainRepo(() => agent(
+    `In repo ${repoPath}, delete .cys/state.json if it exists (the run finished naturally; ` +
+    `no incomplete state to report). It's fine if it doesn't exist already.`,
+    { label: 'state-clear', phase: 'Handoff' }
+  ));
+}
 
 const IMPLEMENTER_SCHEMA = {
   type: 'object',
@@ -111,11 +140,13 @@ function progressBar() {
 // tarea: las ramas específicas settlean con su etiqueta y la red de seguridad de
 // runTask no las cuenta dos veces.
 const settledTasks = new Set();
-function settle(taskId, label) {
+async function settle(taskId, status, label, extra = {}) {
   if (settledTasks.has(taskId)) return;
   settledTasks.add(taskId);
   settledCount += 1;
+  taskStates.set(taskId, { status, ...extra });
   log(`${progressBar()} — Task ${taskId} (branch task-${taskId}) ${label}`);
+  await writeState();
 }
 
 // agent() devuelve null si el usuario saltea el agente o si murió por un error terminal
@@ -132,7 +163,7 @@ async function assertNotBlocked(taskId, impl) {
   if (impl.status !== 'BLOCKED' && impl.status !== 'NEEDS_CONTEXT') return;
   const detail = impl.concerns ?? 'no detail given';
   await appendLedger(`Task ${taskId}: ${impl.status} — ${detail}`);
-  settle(taskId, impl.status);
+  await settle(taskId, 'failed', impl.status, { reason: detail });
   throw new Error(`Task ${taskId} ${impl.status}: ${detail}`);
 }
 
@@ -251,7 +282,7 @@ async function runTask(taskId) {
     // Red de seguridad: cualquier salida de executeTask — también las no previstas —
     // cuenta en la barra de progreso; settle es idempotente, así que las ramas que ya
     // settlearon con una etiqueta específica no se cuentan dos veces.
-    settle(taskId, 'FAILED');
+    await settle(taskId, 'failed', 'FAILED', { reason: error?.message ?? String(error) });
     throw error;
   }
 }
@@ -276,7 +307,7 @@ async function executeTask(taskId) {
     verdict = ensureAgentResult(taskId, await review(task, impl), 'reviewer');
     if (verdict.qualityVerdict === 'NEEDS_FIXES' || verdict.specVerdict === 'FAIL') {
       await appendLedger(`Task ${taskId}: blocked — review still failing after one fix round`);
-      settle(taskId, 'FAILED (review)');
+      await settle(taskId, 'failed', 'FAILED (review)', { reason: verdict.findings });
       throw new Error(`Task ${taskId}: review still failing after one fix round: ${verdict.findings}`);
     }
   }
@@ -319,7 +350,7 @@ async function executeTask(taskId) {
 
   if (mergeResult.mergeStatus === 'CONFLICT') {
     await appendLedger(`Task ${taskId}: merge CONFLICT — ${mergeResult.detail ?? 'no detail given'}`);
-    settle(taskId, 'FAILED (merge conflict)');
+    await settle(taskId, 'failed', 'FAILED (merge conflict)', { reason: mergeResult.detail ?? 'no detail given' });
     throw new Error(`Task ${taskId} merge CONFLICT: ${mergeResult.detail ?? 'no detail given'}`);
   }
 
@@ -329,17 +360,27 @@ async function executeTask(taskId) {
     `(${duration}, commits ` +
     `${impl.baseSha.slice(0, 7)}..${impl.headSha.slice(0, 7)}, review clean)`
   );
-  settle(taskId, `done in ${duration}`);
+  await settle(taskId, 'done', `done in ${duration}`, { branch: `task-${taskId}`, headSha: impl.headSha });
   return impl;
 }
 
-const results = await runDag(graph, runTask);
+// finishOnly (Fase 4b, hallazgo Important #2 de la revisión final): bin/plan-remainder.js
+// marca allDone cuando una corrida anterior ya mergeó todas las tareas y se cortó antes
+// de llegar a la revisión final/handoff — acá no hay nada que implementar ni mergear, así
+// que se saltea el DAG entero y se va directo a esa parte, en vez de fallar por falta de
+// tareas o repetir trabajo ya hecho.
+let results = new Map();
+if (!finishOnly) {
+  await writeState();
+  results = await runDag(graph, runTask);
+  // Las tareas skipped nunca pasan por runTask; reconciliar para que la barra cierre en N/N.
+  settledCount = results.size;
+  log(`${progressBar()} — ejecución terminada`);
+} else {
+  log('finishOnly: no hay tareas que ejecutar — todo se mergeó en una corrida anterior, solo falta la revisión final y el handoff.');
+}
 
-// Las tareas skipped nunca pasan por runTask; reconciliar para que la barra cierre en N/N.
-settledCount = results.size;
-log(`${progressBar()} — ejecución terminada`);
-
-const mergedCount = [...results.values()].filter((r) => r.status === 'done').length;
+const mergedCount = finishOnly ? 1 : [...results.values()].filter((r) => r.status === 'done').length;
 let finalReview = null;
 let handoffResult = null;
 if (mergedCount > 0) {
@@ -381,4 +422,5 @@ const serializableResults = Object.fromEntries(
       : r,
   ])
 );
+await deleteState();
 return { results: serializableResults, finalReview, handoff: handoffResult };

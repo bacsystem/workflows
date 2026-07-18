@@ -27,7 +27,22 @@ REPO = `${CLAUDE_PLUGIN_ROOT}`
    the user for it in plain language before continuing. Do not guess a plan path, a
    target repo, or a branch name.
 
-2. **Sanity-check before running anything**:
+2. **Check for leftover state from an interrupted run**: check whether
+   `<repo-path>/.cys/state.json` exists. If it does not, continue
+   normally — step 4 below uses `bin/parse-plan.js` as usual.
+   - If it exists, read it:
+     - If its `planPath` matches `<plan-path>` exactly: tell the user
+       which tasks are already `done`/`failed`/pending per the file, and
+       ask whether to continue with only what's left (step 4 below then
+       uses `bin/plan-remainder.js` instead of `bin/parse-plan.js`) or
+       start fresh (delete `<repo-path>/.cys/state.json` first; step 4
+       then uses `bin/parse-plan.js` as usual).
+     - If its `planPath` does not match: warn the user there's
+       incomplete state from a different, unrelated run and ask how to
+       proceed (look at it first / delete it and continue / stop) —
+       never decide silently.
+
+3. **Sanity-check before running anything**:
    - Confirm `plan-path` exists and looks like an approved plan (has `### Task N:`
      blocks). If it looks like a spec instead of a plan, say so and stop.
    - Confirm `repo-path` is a git repo with a clean working tree (`git status`). If it's
@@ -37,12 +52,22 @@ REPO = `${CLAUDE_PLUGIN_ROOT}`
      directly, warn them (mainline should never take agent merges directly) and confirm
      they really want that before proceeding.
 
-3. **Parse the plan**: run `node bin/parse-plan.js <plan-path>` from `REPO`, capturing
-   stdout as JSON (`{ tasks, graph, warnings }`). Show any warnings to the user — in
-   particular a duplicate-producer warning or an empty graph is worth surfacing before
-   launching, not after.
+4. **Parse the plan**: if step 2 confirmed resuming a previous run, run
+   `node REPO/bin/plan-remainder.js <plan-path> <repo-path>/.cys/state.json`
+   instead of the command below. Otherwise, run
+   `node bin/parse-plan.js <plan-path>` from `REPO`. Either way, capture
+   stdout as JSON (`{ tasks, graph, warnings, allDone? }`). Show any
+   warnings to the user — in particular a duplicate-producer warning or
+   an empty graph is worth surfacing before launching, not after.
+   - If `allDone` is `true` (only present when resuming): every task was
+     already merged in the earlier run — nothing to implement, only the
+     final whole-branch review and handoff never finished. Tell the user
+     this, skip steps 5 and 7 below (no new merges, no new branch), and
+     launch (step 8) with `finishOnly: true` and empty `tasks`/`graph`
+     instead of what `plan-remainder.js` printed for those two fields.
 
-4. **Ask what's still missing**, in plain language, one question at a time:
+5. **Ask what's still missing** (skip this step if `allDone` was `true`),
+   in plain language, one question at a time:
    - Whether to push and open a PR at the end (`openPr`), and if so, the PR base branch
      (`pr.base`) and any optional fields (`assignees`, `labels`, `milestone`, `closes`).
    - **Their explicit merge authorization**, naming the branches (e.g. "I authorize
@@ -52,24 +77,26 @@ REPO = `${CLAUDE_PLUGIN_ROOT}`
      they decline to give one, proceed without it and mention that some merges may then
      need authorizing individually mid-run.
 
-5. **Summarize before launching**: plan path, repo, task count, integration branch,
+6. **Summarize before launching**: plan path, repo, task count, integration branch,
    openPr/PR settings, and confirm the authorization text with the user. This is a real
    run against their repo — don't skip the confirmation.
 
-6. **Create the integration branch if it doesn't exist**: run
+7. **Create the integration branch if it doesn't exist** (skip if `allDone`
+   was `true` — the branch already has everything merged on it): run
    `git -C <repo-path> show-ref --verify --quiet
    refs/heads/<integration-branch>`. If it exits non-zero, create it from `develop`:
    `git -C <repo-path> branch <integration-branch> develop`. If
-   it exits 0, the branch already exists — step 2's sanity check already
+   it exits 0, the branch already exists — step 3's sanity check already
    covers its naming, nothing more to do here.
 
-7. **Launch**: invoke the `Workflow` tool with:
+8. **Launch**: invoke the `Workflow` tool with:
    - `scriptPath`: `<REPO>/workflows/parallel-plan-executor.js`
-   - `args`: `{ tasks, graph, planPath, repoPath, integrationBranch, executorPath: <REPO>, openPr, pr, mergeAuthorization }`
+   - `args`: if `allDone` was `true`, `{ tasks: [], graph: {}, planPath, repoPath, integrationBranch, executorPath: <REPO>, finishOnly: true, openPr, pr }` (no `mergeAuthorization` — nothing merges in this mode). Otherwise,
+     `{ tasks, graph, planPath, repoPath, integrationBranch, executorPath: <REPO>, openPr, pr, mergeAuthorization }`
      (executorPath is REPO — the workflow invokes REPO/bin scripts by exact path;
      omit `openPr`/`pr`/`mergeAuthorization` if not provided)
 
-8. **After launching**: tell the user it's running in the background, mention they can
+9. **After launching**: tell the user it's running in the background, mention they can
    ask "how's the workflow going?" any time or open `/workflows`, and that you'll report
    back when it finishes or if a merge needs authorization.
 

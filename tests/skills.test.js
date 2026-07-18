@@ -75,6 +75,27 @@ test('los comandos crean la integrationBranch desde develop si no existe antes d
   }
 });
 
+test('los comandos detectan .cys/state.json de una corrida interrumpida (Fase 4b)', () => {
+  const flow = readFileSync(path.join(root, 'commands', 'flow.md'), 'utf8');
+  const runPlan = readFileSync(path.join(root, 'commands', 'run-plan.md'), 'utf8');
+  assert.ok(
+    flow.includes('.cys/state.json'),
+    'commands/flow.md debe chequear si hay estado de una corrida interrumpida'
+  );
+  assert.ok(
+    runPlan.includes('.cys/state.json') && runPlan.includes('bin/plan-remainder.js'),
+    'commands/run-plan.md debe chequear el estado y ofrecer bin/plan-remainder.js para reanudar'
+  );
+});
+
+test('run-plan.md maneja allDone lanzando con finishOnly en vez de fallar por tasks vacío (final review, hallazgo Important #2)', () => {
+  const runPlan = readFileSync(path.join(root, 'commands', 'run-plan.md'), 'utf8');
+  assert.ok(
+    runPlan.includes('allDone') && runPlan.includes('finishOnly: true'),
+    'run-plan.md debe detectar allDone y lanzar con finishOnly en vez de reintentar tareas ya mergeadas'
+  );
+});
+
 test('cada comando del plugin tiene frontmatter con description', () => {
   const commandsDir = path.join(root, 'commands');
   const files = readdirSync(commandsDir).filter((f) => f.endsWith('.md'));

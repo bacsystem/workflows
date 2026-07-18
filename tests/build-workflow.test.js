@@ -26,7 +26,7 @@ test('build script embeds the args validation and the template invokes it before
   assert.ok(output.includes('function assertAcyclic('));
   assert.ok(!output.includes('__VALIDATION_SOURCE__'));
   assert.ok(!output.includes('import '), 'the built file must be self-contained, no imports');
-  const validateIndex = output.indexOf('validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization })');
+  const validateIndex = output.indexOf('validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly })');
   assert.ok(validateIndex >= 0, 'the template must invoke validateWorkflowArgs with integrationBranch');
   assert.ok(
     validateIndex < output.indexOf('agent('),
@@ -43,7 +43,7 @@ test('built workflow tolerates args delivered as a JSON string (real harness beh
 
 test('built workflow names the integration branch explicitly instead of letting agents guess', () => {
   assert.ok(
-    output.includes('integrationBranch, executorPath, openPr, pr, mergeAuthorization } = resolvedArgs'),
+    output.includes('integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly } = resolvedArgs'),
     'integrationBranch y executorPath deben venir de los args resueltos (objeto o string parseado)'
   );
   assert.ok(
@@ -108,8 +108,8 @@ test('built workflow serializes every main-repo working-tree operation through o
     'fix() debe pasar por la cola del repo principal'
   );
   assert.equal(
-    (output.match(/enqueueMainRepo\(/g) ?? []).length, 4,
-    'exactamente cuatro apariciones: la definición y los call sites de ledger, fix y merge'
+    (output.match(/enqueueMainRepo\(/g) ?? []).length, 6,
+    'exactamente seis apariciones: la definición y los call sites de ledger, fix, merge, writeState y deleteState'
   );
   assert.ok(
     !output.includes('fixQueueTail') && !output.includes('mergeQueueTail'),
@@ -249,7 +249,7 @@ test('built workflow opens the PR only with explicit openPr consent, and never m
 
 test('built workflow settles every terminal branch and reconciles the progress bar', () => {
   assert.ok(output.includes('function settle('), 'progress accounting must be centralized in a settle() helper');
-  assert.ok(output.includes("settle(taskId, 'FAILED (review)')"), 'the review-failed-after-fix branch must count as settled');
+  assert.ok(output.includes("settle(taskId, 'failed', 'FAILED (review)'"), 'the review-failed-after-fix branch must count as settled');
   assert.ok(output.includes('settledCount = results.size'), 'skipped tasks must be reconciled after runDag');
 });
 
@@ -269,5 +269,27 @@ test('el template vive fuera de workflows/, para no duplicarse en el listado de 
   assert.ok(
     !existsSync(path.join(root, 'workflows', 'parallel-plan-executor.template.js')),
     'workflows/ no debe tener ningún archivo con export const meta además del generado — causa raíz confirmada del duplicado cys:parallel-plan-executor en el listado de skills'
+  );
+});
+
+test('built workflow writes .cys/state.json at start, updates it per settle, and deletes it before the final return (Fase 4b)', () => {
+  assert.ok(
+    output.includes('const taskStates = new Map('),
+    'debe existir un registro en memoria del estado de cada tarea'
+  );
+  assert.ok(
+    output.includes('.cys/state.json'),
+    'el motor debe escribir/borrar .cys/state.json'
+  );
+  assert.ok(
+    output.includes('async function settle('),
+    'settle() debe ser async para poder escribir el estado antes de continuar'
+  );
+  const deleteIndex = output.indexOf('delete .cys/state.json');
+  const returnIndex = output.indexOf('return { results: serializableResults, finalReview, handoff: handoffResult };');
+  assert.ok(deleteIndex >= 0, 'debe existir la instrucción de borrar el estado');
+  assert.ok(
+    deleteIndex < returnIndex,
+    'el borrado debe ocurrir antes del return final, para que solo quede el archivo si el script se cortó antes de llegar ahí'
   );
 });
