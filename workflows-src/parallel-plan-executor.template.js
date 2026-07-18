@@ -358,9 +358,11 @@ async function executeTask(taskId) {
         `${integrationBranch}\`. If it exits 0, branch task-${taskId} is ALREADY integrated: ` +
         `report mergeStatus MERGED with detail "already an ancestor, nothing to do" and do ` +
         `NOT run any merge command.\n\n` +
-        `Otherwise, merge branch task-${taskId} into branch ${integrationBranch} of repo ${repoPath}. Report ` +
-        `mergeStatus MERGED on success. If there is a real merge conflict, do not resolve it ` +
-        `automatically — stop and report mergeStatus CONFLICT with the conflict details in "detail".` +
+        `Otherwise, merge branch task-${taskId} into branch ${integrationBranch} of repo ${repoPath} ` +
+        `using \`git merge --no-ff\` — always create a merge commit, even when a fast-forward would ` +
+        `be possible, so every task's integration leaves a consistent, explicit commit regardless of ` +
+        `execution order. Report mergeStatus MERGED on success. If there is a real merge conflict, do ` +
+        `not resolve it automatically — stop and report mergeStatus CONFLICT with the conflict details in "detail".` +
         (mergeAuthorization
           // Piloto 2026-07-16, hallazgo F8: sin esto, el agente de merge no tiene forma de
           // saber que el usuario ya autorizó el run — algunos se autobloqueaban leyendo la

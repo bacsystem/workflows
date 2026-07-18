@@ -173,3 +173,19 @@ test('guide documenta la alternativa manual cuando cys:run no está disponible (
     'cys:guide debe explicar qué hacer cuando cys:run no está disponible (Cursor, por ahora)'
   );
 });
+
+test('code-standards documenta que la unicidad de negocio necesita respaldo a nivel de base de datos, no solo un chequeo en la capa de servicio (TOCTOU, hallazgo real de persons-crud)', () => {
+  const codeStandards = readFileSync(path.join(skillsDir, 'check', 'references', 'code-standards.md'), 'utf8');
+  assert.ok(
+    codeStandards.includes('TOCTOU') && codeStandards.includes('database-level backstop'),
+    'code-standards.md debe advertir sobre invariantes de unicidad sin respaldo de base de datos'
+  );
+});
+
+test('plan exige un test por fila cuando el spec afirma cobertura exhaustiva de una tabla (hallazgo real de persons-crud)', () => {
+  const plan = readFileSync(path.join(skillsDir, 'plan', 'SKILL.md'), 'utf8');
+  assert.ok(
+    plan.includes('Exhaustive-coverage claims'),
+    'cys:plan debe exigir enumerar cada fila como test explícito cuando el spec afirma cobertura exhaustiva'
+  );
+});

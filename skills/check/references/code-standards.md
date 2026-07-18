@@ -51,6 +51,17 @@ once before writing code and check against it during self-review.
   and the expectation, so the failure explains itself.
 - Never swallow an exception without recording why that's safe.
 
+## Data integrity
+
+- A field or combination the domain calls "unique"/"must not collide"
+  needs a database-level backstop (a unique index/constraint), not only
+  an application-layer existence check before insert/update — two
+  concurrent requests can both pass that check before either writes
+  (TOCTOU). Flag application-only uniqueness as a finding even when the
+  design spec only ruled out expressing it via Bean-Validation-style
+  annotations — that rules out one mechanism, not a storage-layer
+  constraint.
+
 ## Test hygiene
 
 - Tests assert behavior, not implementation details; a refactor that

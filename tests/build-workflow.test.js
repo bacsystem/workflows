@@ -380,3 +380,10 @@ test('built workflow marks a task in_progress per phase before settling, instead
     "debe marcarse 'Merge' antes de intentar el merge"
   );
 });
+
+test('built workflow forces a real merge commit for task integrations, never a silent fast-forward', () => {
+  assert.ok(
+    output.includes('--no-ff'),
+    'sin --no-ff, git hace fast-forward cuando puede, dejando un historial inconsistente entre tareas según el orden real de ejecución'
+  );
+});

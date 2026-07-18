@@ -88,6 +88,11 @@ Each step is one 2-5 minute action, with complete content — never
 - **Parser dry-run:** run `node <executor>/bin/parse-plan.js <plan>` and
   read the graph — verify the parallelism you designed is the parallelism
   it inferred, and surface any warnings to the user.
+- **Exhaustive-coverage claims:** if the spec states a test suite "covers
+  every case in this table" (or similar), the plan's test steps must
+  enumerate each row as its own explicit test step — a summary claim
+  without one step per row is a gap the plan itself introduced, not
+  something later tasks can be trusted to infer.
 
 ## Hand off
 
