@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.9 — 2026-07-18
+
+Fixed:
+
+- `src/plan-parser.js`'s `parseInterfaces()` silently dropped a
+  `Consumes:`/`Produces:` line with nothing after the colon — indistinguishable
+  from an intentional `None`/`N/A`/`nothing` — producing a completely
+  empty dependency graph with zero warnings when a plan author nested
+  the symbols as sub-bullets instead of writing them flat on the same
+  line. Now warns (with a specific hint when a nested sub-bullet follows)
+  instead of failing silently. Found and reported, with full repro and a
+  requested fix, by a real user writing a plan via `cys:plan`.
+
 ## 0.6.8 — 2026-07-18
 
 Fixed:
