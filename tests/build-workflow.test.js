@@ -293,3 +293,18 @@ test('built workflow writes .cys/state.json at start, updates it per settle, and
     'el borrado debe ocurrir antes del return final, para que solo quede el archivo si el script se cortó antes de llegar ahí'
   );
 });
+
+test('built workflow appends unresolved final-review findings to .cys/pending.md via the Handoff agent (cys pending tracker)', () => {
+  assert.ok(
+    output.includes('.cys/pending.md'),
+    'el prompt de handoff debe instruir escribir en .cys/pending.md'
+  );
+  assert.ok(
+    output.includes('## Bugs') && output.includes('## Gaps') && output.includes('## Tareas'),
+    'el esqueleto de pending.md debe tener las tres secciones fijas'
+  );
+  assert.ok(
+    output.includes('pendingLogged'),
+    'el agente debe reportar cuántos ítems agregó, para poder mostrarlo en el log final'
+  );
+});

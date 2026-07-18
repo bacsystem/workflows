@@ -120,3 +120,22 @@ test('guide y ship documentan que se superponen cuando cys:run corre con openPr:
     'cys:ship debe aclarar que no hace falta invocarlo si cys:run ya abrió el PR solo'
   );
 });
+
+test('guide documenta la convención .cys/pending.md y sus tres secciones fijas', () => {
+  const guide = readFileSync(path.join(skillsDir, 'guide', 'SKILL.md'), 'utf8');
+  assert.ok(
+    guide.includes('.cys/pending.md') &&
+      guide.includes('## Bugs') &&
+      guide.includes('## Gaps') &&
+      guide.includes('## Tareas'),
+    'cys:guide debe documentar el archivo de pendientes y sus tres secciones fijas'
+  );
+});
+
+test('check documenta que un hallazgo diferido se registra en .cys/pending.md', () => {
+  const check = readFileSync(path.join(skillsDir, 'check', 'SKILL.md'), 'utf8');
+  assert.ok(
+    check.includes('.cys/pending.md'),
+    'cys:check debe anotar en .cys/pending.md los hallazgos que el usuario decide no corregir ahora'
+  );
+});
