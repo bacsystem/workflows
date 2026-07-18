@@ -85,30 +85,81 @@ como el slash command `/cys:run-plan`, y `commands/flow.md` como
 
 ### Cursor
 
-A diferencia de Claude Code, Cursor no tiene hoy un comando propio y de
-autoservicio para "instalar desde cualquier repo de GitHub". La única
-forma de instalar cys como usuario individual (sin pasar por el
-Marketplace oficial de Cursor, con revisión manual del equipo, ni por la
-importación privada de un admin de Team/Enterprise) es el mecanismo
-propio de Cursor de **desarrollo local de plugins**:
+Cursor no tiene un comando tipo `/plugin marketplace add <repo>` como
+Claude Code, pero sí tiene una vía de "instalar desde un repo local" en
+su propia UI de Settings (confirmado funcionando de verdad — la UI de
+plugins de Cursor cambió después de escribir esta sección por primera
+vez, así que confiá en estos pasos antes que en cualquier captura vieja
+que encuentres en otro lado):
 
 1. Clona este repo (ver [Instalación](#instalación) abajo — para solo
    usar las skills alcanza con clonar, no hace falta compilar el
    artefacto del workflow ni correr su suite de tests).
-2. Enlazá o copiá el clon a la carpeta de plugins locales de Cursor — la
-   ruta exacta es `~/.cursor/plugins/local/<nombre>` según la
-   [documentación de plugins de Cursor](https://cursor.com/docs/plugins);
-   confirmá el equivalente en tu sistema operativo (ej. Windows:
-   `%USERPROFILE%\.cursor\plugins\local\cys`). Un symlink es preferible a
-   una copia, para que los `git pull` futuros se reflejen solos:
-   ```
-   ln -s /ruta/absoluta/a/tu/clon ~/.cursor/plugins/local/cys
-   ```
-3. Recargá Cursor (Paleta de comandos → "Developer: Reload Window") para
-   que tome el plugin.
+2. En Cursor: **Settings → Plugins** (o el panel **Customize**, si tu
+   versión ya movió la gestión de plugins ahí) → **+ Add** → **From
+   Local Repo** → apuntá a la ruta absoluta de tu clon.
+3. `cys` aparece bajo un grupo "Bacsystem" (viene del campo `author` de
+   `plugin.json`) con un botón **Add** — hacé clic. Cuando diga
+   **Added**, las skills ya están activas, sin necesidad de recargar.
 
-Una vez cargado, invocá las skills igual que cualquier otra skill de
-Cursor (ej. `/design`, `/plan`).
+Invocá las skills igual que cualquier otra skill de Cursor (ej.
+`/design`, `/plan`).
+
+<details>
+<summary>Si no te aparece "From Local Repo" o cys no aparece después de agregarlo</summary>
+
+- **¿Usaste un symlink a mano y no aparece?** Revisá que el symlink use
+  la ruta **absoluta** de tu clon, no una relativa — `ln -s
+  parallel-plan-executor ~/.cursor/plugins/local/cys` (relativa) queda
+  roto porque se resuelve contra la carpeta *donde vive el symlink*
+  (`~/.cursor/plugins/local/`), no contra donde corriste el comando.
+  Confirmalo con `ls -la ~/.cursor/plugins/local/cys` — tiene que mostrar
+  la ruta absoluta completa apuntando a tu clon real, no solo el nombre
+  de una carpeta.
+- **Estás viendo la página vieja de "Plugins" y no aparece nada
+  instalado que reconozcas**: Cursor puede mostrar un aviso arriba de
+  esa página ("Plugins are moving to Customize") — hacé clic en **"Open
+  Customize"** y repetí los pasos 2-3 de ahí, es la vista que realmente
+  está activa hoy.
+- Si ninguna de las dos aplica, queda el mecanismo alternativo (más
+  viejo, puede no aplicar a tu versión de Cursor) descrito abajo.
+
+</details>
+
+<details>
+<summary>Alternativa: symlink a la carpeta de plugins locales de Cursor</summary>
+
+Si tu versión de Cursor no tiene el flujo "From Local Repo", el
+mecanismo documentado más viejo sigue funcionando: enlazá el clon a la
+carpeta de plugins locales de Cursor (`~/.cursor/plugins/local/<nombre>`
+en macOS/Linux, según la
+[documentación de plugins de Cursor](https://cursor.com/docs/plugins)).
+Un symlink es preferible a una copia, para que los `git pull` futuros se
+reflejen solos — **usá siempre la ruta absoluta de tu clon como destino
+del symlink**, no una relativa (una ruta relativa se resuelve contra la
+carpeta del symlink, no contra donde corriste el comando, y queda rota en
+silencio):
+
+**macOS / Linux:**
+```
+mkdir -p ~/.cursor/plugins/local
+ln -s /ruta/absoluta/a/tu/clon ~/.cursor/plugins/local/cys
+```
+
+**Windows (PowerShell):**
+```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.cursor\plugins\local" | Out-Null
+New-Item -ItemType Junction -Path "$env:USERPROFILE\.cursor\plugins\local\cys" -Target "C:\ruta\absoluta\a\tu\clon"
+```
+Una junction (`New-Item -ItemType Junction`, o `mklink /J` desde
+`cmd.exe`) funciona sin permisos de administrador, a diferencia de un
+symlink de directorio normal (`New-Item -ItemType SymbolicLink` /
+`mklink /D`), que necesita una consola elevada o tener el Modo
+Desarrollador activado.
+
+Después, recargá Cursor (Paleta de comandos → "Developer: Reload
+Window") para que lo tome.
+</details>
 
 ## Requisitos
 
