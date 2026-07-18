@@ -52,6 +52,31 @@ change that never went through `cys:run` at all. Running both after an
   branch) ← `task-N` (one per plan task). Agents never touch `main` or
   `develop` directly.
 
+## Pendientes (`.cys/pending.md`)
+
+An optional, freeform file at `<repo>/.cys/pending.md` for tracking bugs,
+gaps, and pending tasks across sessions instead of letting them evaporate
+from chat. Three fixed sections, always in this order:
+
+    # Pendientes
+
+    ## Bugs
+    - [ ] broken or incorrect behavior
+
+    ## Gaps
+    - [ ] scope left out of a design/spec/review, on purpose or by omission
+
+    ## Tareas
+    - [ ] anything else pending
+
+Anyone adds a line (`- [ ]`) or checks one off (`- [x]`) by editing the
+file directly — no special tooling, and `cys:guide` never creates it. On
+invocation, `cys:guide` is the only place that reads it to remind the
+user: if the file exists and has unchecked items, list them grouped by
+section before presenting the flow table (skip a section with nothing
+open). `cys:run`'s Handoff agent and `cys:check` write to it when a
+review finding is left unresolved — see `cys:check`.
+
 ## What cys does not do
 
 - No sequential plan execution mode — the executor's DAG already

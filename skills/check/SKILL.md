@@ -37,6 +37,26 @@ Recommendations / Assessment ("Ready to merge? yes/no" with reasoning).
 Look specifically for cross-boundary defects a per-task review cannot
 see: interface mismatches, duplicated logic, contract drift.
 
+### Deferring a finding
+
+When the user responds to a finding with anything other than fixing it
+now (e.g. "later", "not now", "leave it") — whether from a per-task
+review, a whole-branch review, or a standalone `cys:check` run — append
+it to `<repo>/.cys/pending.md`: under `## Bugs` for broken/incorrect
+behavior, or `## Gaps` for missing/deferred scope. Create the file with
+the standard skeleton first if it doesn't exist yet:
+
+    # Pendientes
+
+    ## Bugs
+
+    ## Gaps
+
+    ## Tareas
+
+Keep the finding's own wording and `file:line`. Never touch `## Tareas`
+— that section is free-form user/agent notes, not review output.
+
 ## Verifying before claiming
 
 Never state "done", "fixed", "passing" or "works" without having run the
