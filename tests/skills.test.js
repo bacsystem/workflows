@@ -120,3 +120,56 @@ test('guide y ship documentan que se superponen cuando cys:run corre con openPr:
     'cys:ship debe aclarar que no hace falta invocarlo si cys:run ya abrió el PR solo'
   );
 });
+
+test('guide documenta la convención .cys/pending.md y sus tres secciones fijas', () => {
+  const guide = readFileSync(path.join(skillsDir, 'guide', 'SKILL.md'), 'utf8');
+  assert.ok(
+    guide.includes('.cys/pending.md') &&
+      guide.includes('## Bugs') &&
+      guide.includes('## Gaps') &&
+      guide.includes('## Tareas'),
+    'cys:guide debe documentar el archivo de pendientes y sus tres secciones fijas'
+  );
+});
+
+test('check documenta que un hallazgo diferido se registra en .cys/pending.md', () => {
+  const check = readFileSync(path.join(skillsDir, 'check', 'SKILL.md'), 'utf8');
+  assert.ok(
+    check.includes('.cys/pending.md'),
+    'cys:check debe anotar en .cys/pending.md los hallazgos que el usuario decide no corregir ahora'
+  );
+});
+
+test('run-plan.md y flow.md ofrecen el texto de reintento manual (Routine Local) al terminar de lanzar (Fase 4c)', () => {
+  const runPlan = readFileSync(path.join(root, 'commands', 'run-plan.md'), 'utf8');
+  const flow = readFileSync(path.join(root, 'commands', 'flow.md'), 'utf8');
+  for (const [name, content] of [['run-plan.md', runPlan], ['flow.md', flow]]) {
+    assert.ok(
+      content.includes('Desktop Local Routine') &&
+        content.includes('Check whether <repo-path>/.cys/state.json exists') &&
+        content.includes("don't have one this time"),
+      `commands/${name} debe ofrecer el texto de reintento manual, chequear .cys/state.json y no dar autorización de merge en el prompt generado`
+    );
+  }
+});
+
+test('.cursor-plugin/plugin.json comparte el mismo directorio de skills, sin fork (Cursor portability)', () => {
+  const cursorManifest = JSON.parse(readFileSync(path.join(root, '.cursor-plugin', 'plugin.json'), 'utf8'));
+  const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
+  assert.equal(cursorManifest.name, 'cys');
+  assert.equal(cursorManifest.skills, './skills/', 'debe apuntar al mismo directorio que usa Claude Code, sin fork');
+  assert.equal(
+    cursorManifest.version,
+    pkg.version,
+    'sin este candado, un bump de versión deja el manifest de Cursor desincronizado en silencio'
+  );
+});
+
+test('guide documenta la alternativa manual cuando cys:run no está disponible (Cursor)', () => {
+  const guide = readFileSync(path.join(skillsDir, 'guide', 'SKILL.md'), 'utf8');
+  assert.ok(
+    guide.includes('On Cursor,') &&
+      guide.includes('execute its tasks yourself in dependency order'),
+    'cys:guide debe explicar qué hacer cuando cys:run no está disponible (Cursor, por ahora)'
+  );
+});

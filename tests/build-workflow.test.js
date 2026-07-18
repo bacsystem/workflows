@@ -293,3 +293,68 @@ test('built workflow writes .cys/state.json at start, updates it per settle, and
     'el borrado debe ocurrir antes del return final, para que solo quede el archivo si el script se cortó antes de llegar ahí'
   );
 });
+
+test('built workflow tags .cys/state.json writes with their own phase, not Merge (pending.md bug)', () => {
+  assert.ok(
+    output.includes("{ title: 'State' }"),
+    "debe declararse una fase 'State' en meta.phases para las escrituras de bookkeeping"
+  );
+  const writeStateIndex = output.indexOf("label: 'state',");
+  assert.ok(writeStateIndex >= 0, "debe existir la llamada de agente etiquetada 'state'");
+  assert.ok(
+    output.slice(writeStateIndex, writeStateIndex + 40).includes("phase: 'State'"),
+    "la escritura de estado no debe quedar bajo phase: 'Merge' — corre antes de la primera tarea y en cada settle(), no solo durante merges"
+  );
+});
+
+test('built workflow frames the state-write prompt as verified bookkeeping, not new claims (safety-classifier block, pending.md bug)', () => {
+  assert.ok(
+    output.includes('bookkeeping snapshot') && output.includes('already completed and verified earlier in this same run'),
+    'sin este framing, el clasificador de seguridad puede leer un JSON con status "done" y SHAs reales como una fabricación en vez de un registro legítimo de resultados ya verificados'
+  );
+});
+
+test('built workflow adds updatedAt to .cys/state.json via the write agent\'s own date command (pending.md gap, Fase 4b design)', () => {
+  const writeStateIndex = output.indexOf('function writeState()');
+  assert.ok(writeStateIndex >= 0, 'debe existir writeState()');
+  const writeStateBody = output.slice(writeStateIndex, writeStateIndex + 1400);
+  assert.ok(
+    writeStateBody.includes('date +%H:%M:%S'),
+    'el timestamp no puede venir de Date.now()/new Date() (prohibido en el sandbox de Workflow) — debe pedirle al agente que corra date'
+  );
+  assert.ok(
+    writeStateBody.includes('updatedAt'),
+    'el campo updatedAt del diseño original de Fase 4b sigue faltando en el JSON escrito'
+  );
+});
+
+test('built workflow instructs the Handoff agent to surface pendingLogged inside handoff.md itself, not just the run log (pending.md gap, Important finding)', () => {
+  const classifyIndex = output.indexOf('Classify every finding in the final review');
+  const handoffWriteIndex = output.indexOf('.cys/handoff.md containing');
+  assert.ok(classifyIndex >= 0, 'debe existir el paso de clasificación/registro en pending.md dentro del prompt de handoff');
+  assert.ok(handoffWriteIndex >= 0, 'debe existir el paso de redacción de handoff.md');
+  assert.ok(
+    classifyIndex < handoffWriteIndex,
+    'pendingLogged debe calcularse ANTES de redactar handoff.md, para poder citar el conteo adentro'
+  );
+  const handoffStepBody = output.slice(handoffWriteIndex, handoffWriteIndex + 500);
+  assert.ok(
+    handoffStepBody.includes('pendingLogged'),
+    'la instrucción de handoff.md debe mencionar pendingLogged explícitamente — el diseño pedía que el usuario lo vea sin abrir .cys/pending.md ni leer el log efímero'
+  );
+});
+
+test('built workflow appends unresolved final-review findings to .cys/pending.md via the Handoff agent (cys pending tracker)', () => {
+  assert.ok(
+    output.includes('.cys/pending.md'),
+    'el prompt de handoff debe instruir escribir en .cys/pending.md'
+  );
+  assert.ok(
+    output.includes('## Bugs') && output.includes('## Gaps') && output.includes('## Tareas'),
+    'el esqueleto de pending.md debe tener las tres secciones fijas'
+  );
+  assert.ok(
+    output.includes('pendingLogged'),
+    'el agente debe reportar cuántos ítems agregó, para poder mostrarlo en el log final'
+  );
+});
