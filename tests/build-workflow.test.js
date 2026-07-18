@@ -314,6 +314,36 @@ test('built workflow frames the state-write prompt as verified bookkeeping, not 
   );
 });
 
+test('built workflow adds updatedAt to .cys/state.json via the write agent\'s own date command (pending.md gap, Fase 4b design)', () => {
+  const writeStateIndex = output.indexOf('function writeState()');
+  assert.ok(writeStateIndex >= 0, 'debe existir writeState()');
+  const writeStateBody = output.slice(writeStateIndex, writeStateIndex + 1400);
+  assert.ok(
+    writeStateBody.includes('date +%H:%M:%S'),
+    'el timestamp no puede venir de Date.now()/new Date() (prohibido en el sandbox de Workflow) — debe pedirle al agente que corra date'
+  );
+  assert.ok(
+    writeStateBody.includes('updatedAt'),
+    'el campo updatedAt del diseño original de Fase 4b sigue faltando en el JSON escrito'
+  );
+});
+
+test('built workflow instructs the Handoff agent to surface pendingLogged inside handoff.md itself, not just the run log (pending.md gap, Important finding)', () => {
+  const classifyIndex = output.indexOf('Classify every finding in the final review');
+  const handoffWriteIndex = output.indexOf('.cys/handoff.md containing');
+  assert.ok(classifyIndex >= 0, 'debe existir el paso de clasificación/registro en pending.md dentro del prompt de handoff');
+  assert.ok(handoffWriteIndex >= 0, 'debe existir el paso de redacción de handoff.md');
+  assert.ok(
+    classifyIndex < handoffWriteIndex,
+    'pendingLogged debe calcularse ANTES de redactar handoff.md, para poder citar el conteo adentro'
+  );
+  const handoffStepBody = output.slice(handoffWriteIndex, handoffWriteIndex + 500);
+  assert.ok(
+    handoffStepBody.includes('pendingLogged'),
+    'la instrucción de handoff.md debe mencionar pendingLogged explícitamente — el diseño pedía que el usuario lo vea sin abrir .cys/pending.md ni leer el log efímero'
+  );
+});
+
 test('built workflow appends unresolved final-review findings to .cys/pending.md via the Handoff agent (cys pending tracker)', () => {
   assert.ok(
     output.includes('.cys/pending.md'),
