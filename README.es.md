@@ -33,7 +33,35 @@ que se describe a continuación.
 **design → plan → run → check → ship**, nombrado en honor a las hijas gemelas del
 autor, **Cielo y Sophia**.
 
-Se instala desde el marketplace autohospedado de este repo, dentro de Claude Code:
+| Skill | Qué hace |
+|---|---|
+| `cys:design` | idea → spec |
+| `cys:plan` | spec → plan de implementación |
+| `cys:run` | el Workflow de este repo — se lanza vía `/cys:run-plan` o `commands/run-plan.md`. **Exclusivo de Claude Code** (ver "Soporte multi-IA" abajo). |
+| `cys:check` | revisión adversarial / verificación |
+| `cys:ship` | commit / bump de SemVer / PR |
+| `cys:guide` | índice — qué skill usar en cada momento |
+
+El plugin también trae `/cys:flow` (exclusivo de Claude Code) — el punto
+de entrada todo-en-uno: le das un repo destino y una idea, y recorre el
+flujo completo (diseño → plan → ejecución paralela) con tus puertas de
+aprobación en cada etapa. Usa `/cys:run-plan` cuando ya tengas un plan
+aprobado.
+
+## Soporte multi-IA
+
+Las cinco skills de cys que no son el motor (`design`, `plan`, `check`,
+`ship`, `guide`) son markdown plano sin acoplamiento a nada específico de
+Claude Code, así que se comparten tal cual — mismo directorio `skills/`,
+sin copia forkeada — en todas las plataformas de abajo. `cys:run`
+(ejecución paralela, el scheduler DAG, revisión adversarial y merge
+serializado) es **exclusivo de Claude Code**: en cualquier otra
+plataforma, `cys:guide` explica cómo ejecutar las tareas de un plan vos
+mismo una vez que `cys:plan` ya generó uno.
+
+### Claude Code
+
+Se instala desde el marketplace autohospedado de este repo:
 
 ```
 /plugin marketplace add bacsystem/parallel-plan-executor
@@ -51,32 +79,36 @@ alternativas equivalentes, por si las necesitas:
 /plugin marketplace add /ruta/absoluta/a/tu/clon
 ```
 
-| Skill | Qué hace |
-|---|---|
-| `cys:design` | idea → spec |
-| `cys:plan` | spec → plan de implementación |
-| `cys:run` | el Workflow de este repo — se lanza vía `/cys:run-plan` o `commands/run-plan.md` |
-| `cys:check` | revisión adversarial / verificación |
-| `cys:ship` | commit / bump de SemVer / PR |
-| `cys:guide` | índice — qué skill usar en cada momento |
+Instalar el plugin también expone el `commands/run-plan.md` de este repo
+como el slash command `/cys:run-plan`, y `commands/flow.md` como
+`/cys:flow` — sin copiar archivos a mano.
 
-Nota: instalar el plugin también expone el `commands/run-plan.md` de este repo como el
-slash command `/cys:run-plan` — sin copiar archivos a mano.
+### Cursor
 
-El plugin también trae `/cys:flow` — el punto de entrada todo-en-uno: le
-das un repo destino y una idea, y recorre el flujo completo (diseño →
-plan → ejecución paralela) con tus puertas de aprobación en cada etapa.
-Usa `/cys:run-plan` cuando ya tengas un plan aprobado.
+A diferencia de Claude Code, Cursor no tiene hoy un comando propio y de
+autoservicio para "instalar desde cualquier repo de GitHub". La única
+forma de instalar cys como usuario individual (sin pasar por el
+Marketplace oficial de Cursor, con revisión manual del equipo, ni por la
+importación privada de un admin de Team/Enterprise) es el mecanismo
+propio de Cursor de **desarrollo local de plugins**:
 
-### Usar cys en Cursor
+1. Clona este repo (ver [Instalación](#instalación) abajo — para solo
+   usar las skills alcanza con clonar, no hace falta compilar el
+   artefacto del workflow ni correr su suite de tests).
+2. Enlazá o copiá el clon a la carpeta de plugins locales de Cursor — la
+   ruta exacta es `~/.cursor/plugins/local/<nombre>` según la
+   [documentación de plugins de Cursor](https://cursor.com/docs/plugins);
+   confirmá el equivalente en tu sistema operativo (ej. Windows:
+   `%USERPROFILE%\.cursor\plugins\local\cys`). Un symlink es preferible a
+   una copia, para que los `git pull` futuros se reflejen solos:
+   ```
+   ln -s /ruta/absoluta/a/tu/clon ~/.cursor/plugins/local/cys
+   ```
+3. Recargá Cursor (Paleta de comandos → "Developer: Reload Window") para
+   que tome el plugin.
 
-Las cinco skills que no son el motor (`design`, `plan`, `check`, `ship`,
-`guide`) también funcionan en [Cursor](https://cursor.com), reusando el
-mismo directorio `skills/` — sin copia forkeada que mantener sincronizada.
-Se instala apuntando Cursor a `.cursor-plugin/` de este repo. La
-ejecución paralela de `cys:run` sigue siendo exclusiva de Claude Code
-(ver Requisitos abajo): en Cursor, `cys:guide` explica cómo ejecutar las
-tareas de un plan vos mismo en su lugar.
+Una vez cargado, invocá las skills igual que cualquier otra skill de
+Cursor (ej. `/design`, `/plan`).
 
 ## Requisitos
 

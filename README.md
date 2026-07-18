@@ -34,7 +34,33 @@ plugin** described next.
 **design → plan → run → check → ship**, named after the author's twin daughters,
 **Cielo y Sophia**.
 
-Install it from this repo's self-hosted marketplace, inside Claude Code:
+| Skill | What it does |
+|---|---|
+| `cys:design` | idea → spec |
+| `cys:plan` | spec → implementation plan |
+| `cys:run` | the Workflow in this repo — launched via `/cys:run-plan` or `commands/run-plan.md`. **Claude Code only** (see "Multi-AI support" below). |
+| `cys:check` | adversarial review / verification |
+| `cys:ship` | commit / SemVer bump / PR |
+| `cys:guide` | index — which skill to use when |
+
+The plugin also ships `/cys:flow` (Claude Code only) — the all-in-one
+entry point: give it a target repo and an idea, and it walks the whole
+flow (design → plan → parallel run) with your approval gates at each
+stage. Use `/cys:run-plan` instead when an approved plan already exists.
+
+## Multi-AI support
+
+cys's five non-engine skills (`design`, `plan`, `check`, `ship`, `guide`)
+are plain Markdown with no Claude-Code-specific coupling, so they're
+shared as-is — same `skills/` directory, no forked copy — across every
+platform below. `cys:run` (parallel execution, the DAG scheduler,
+adversarial review, and serialized merging) is **Claude Code only**: on
+any other platform, `cys:guide` tells you how to execute a plan's tasks
+yourself once `cys:plan` has produced one.
+
+### Claude Code
+
+Install from this repo's self-hosted marketplace:
 
 ```
 /plugin marketplace add bacsystem/parallel-plan-executor
@@ -52,31 +78,34 @@ alternatives, if you need them:
 /plugin marketplace add /absolute/path/to/your/clone
 ```
 
-| Skill | What it does |
-|---|---|
-| `cys:design` | idea → spec |
-| `cys:plan` | spec → implementation plan |
-| `cys:run` | the Workflow in this repo — launched via `/cys:run-plan` or `commands/run-plan.md` |
-| `cys:check` | adversarial review / verification |
-| `cys:ship` | commit / SemVer bump / PR |
-| `cys:guide` | index — which skill to use when |
+Installing the plugin also exposes this repo's `commands/run-plan.md` as the
+`/cys:run-plan` slash command, and `commands/flow.md` as `/cys:flow` — no
+manual file copying needed.
 
-Note: installing the plugin also exposes this repo's `commands/run-plan.md` as the
-`/cys:run-plan` slash command — no manual file copying needed.
+### Cursor
 
-The plugin also ships `/cys:flow` — the all-in-one entry point: give it a
-target repo and an idea, and it walks the whole flow (design → plan →
-parallel run) with your approval gates at each stage. Use `/cys:run-plan`
-instead when an approved plan already exists.
+Unlike Claude Code, Cursor has no public, self-serve "install from any
+GitHub repo" command today. The only way to install cys as an individual
+(outside submitting it to Cursor's official, manually-reviewed
+Marketplace, or a Team/Enterprise admin's private import) is Cursor's own
+**local plugin development** mechanism:
 
-### Using cys on Cursor
+1. Clone this repo (see [Installation](#installation) below — for just
+   the skills, cloning is enough, you don't need to build the workflow
+   artifact or run its test suite).
+2. Link or copy the clone into Cursor's local plugins folder — the exact
+   path is `~/.cursor/plugins/local/<name>` per
+   [Cursor's plugin docs](https://cursor.com/docs/plugins); confirm the
+   equivalent on your OS (e.g. Windows: `%USERPROFILE%\.cursor\plugins\local\cys`).
+   A symlink is preferred over a copy so future `git pull`s stay picked up:
+   ```
+   ln -s /absolute/path/to/your/clone ~/.cursor/plugins/local/cys
+   ```
+3. Reload Cursor (Command Palette → "Developer: Reload Window") to pick
+   up the plugin.
 
-The five non-engine skills (`design`, `plan`, `check`, `ship`, `guide`)
-also work in [Cursor](https://cursor.com), reusing the exact same
-`skills/` directory — no forked copy to keep in sync. Install by pointing
-Cursor at this repo's `.cursor-plugin/`. `cys:run`'s parallel execution
-stays Claude-Code-only (see Requirements below): on Cursor, `cys:guide`
-tells you how to execute a plan's tasks yourself instead.
+Once loaded, invoke skills the same way you would any other Cursor skill
+(e.g. `/design`, `/plan`).
 
 ## Requirements
 
