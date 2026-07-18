@@ -358,3 +358,32 @@ test('built workflow appends unresolved final-review findings to .cys/pending.md
     'el agente debe reportar cuántos ítems agregó, para poder mostrarlo en el log final'
   );
 });
+
+test('built workflow marks a task in_progress per phase before settling, instead of staying "pending" the whole time it runs', () => {
+  assert.ok(output.includes('function markInProgress('), 'debe existir un helper para marcar el estado en curso');
+  assert.ok(output.includes("status: 'in_progress'"), "el estado debe distinguir 'in_progress' de 'pending'");
+  const executeTaskIndex = output.indexOf('async function executeTask(');
+  assert.ok(executeTaskIndex >= 0, 'debe existir executeTask()');
+  const body = output.slice(executeTaskIndex, executeTaskIndex + 3000);
+  assert.equal(
+    (body.match(/markInProgress\(taskId, 'Implement'\)/g) ?? []).length,
+    2,
+    "debe marcarse 'Implement' antes del implement inicial Y antes de fix() — fix() ya etiqueta su propia llamada de agente phase: 'Implement', mismo vocabulario"
+  );
+  assert.equal(
+    (body.match(/markInProgress\(taskId, 'Review'\)/g) ?? []).length,
+    2,
+    "debe marcarse 'Review' antes de la revisión inicial Y antes de la revisión posterior al fix"
+  );
+  assert.ok(
+    body.includes("markInProgress(taskId, 'Merge')"),
+    "debe marcarse 'Merge' antes de intentar el merge"
+  );
+});
+
+test('built workflow forces a real merge commit for task integrations, never a silent fast-forward', () => {
+  assert.ok(
+    output.includes('--no-ff'),
+    'sin --no-ff, git hace fast-forward cuando puede, dejando un historial inconsistente entre tareas según el orden real de ejecución'
+  );
+});

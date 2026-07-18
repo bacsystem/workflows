@@ -393,6 +393,16 @@ async function settle(taskId, status, label, extra = {}) {
   await writeState();
 }
 
+// Sin esto, .cys/state.json muestra 'pending' desde que arranca la corrida hasta que la
+// tarea termina (settle) — indistinguible de "todavía ni empezó" mientras está corriendo
+// activamente. phase usa el mismo vocabulario que ya etiquetan las llamadas de agente
+// (fix() ya usa phase: 'Implement'), no un término nuevo. Hallazgo real de un usuario
+// leyendo state.json durante una corrida en curso.
+function markInProgress(taskId, phase) {
+  taskStates.set(taskId, { status: 'in_progress', phase });
+  return writeState();
+}
+
 // agent() devuelve null si el usuario saltea el agente o si murió por un error terminal
 // de API; sin este guard, ese null explotaba más adelante como un TypeError críptico
 // (p. ej. "Cannot read properties of null (reading 'status')").
@@ -544,21 +554,25 @@ async function runTask(taskId) {
 
 async function executeTask(taskId) {
   const task = tasksById.get(taskId);
+  await markInProgress(taskId, 'Implement');
   // Señal de vida al arrancar (piloto, hallazgo F5): la barra solo se emite al settle,
   // así que sin esto el primer implement largo transcurre en silencio total.
   log(`Task ${taskId}: started (implement) on branch task-${taskId}`);
   let impl = ensureAgentResult(taskId, await implement(task), 'implementer');
   await assertNotBlocked(taskId, impl);
 
+  await markInProgress(taskId, 'Review');
   let verdict = ensureAgentResult(taskId, await review(task, impl), 'reviewer');
   if (verdict.qualityVerdict === 'NEEDS_FIXES' || verdict.specVerdict === 'FAIL') {
     log(`Task ${taskId}: review found issues, fixing once`);
+    await markInProgress(taskId, 'Implement');
     impl = ensureAgentResult(
       taskId,
       await enqueueMainRepo(() => fix(task, impl, verdict.findings)),
       'fix'
     );
     await assertNotBlocked(taskId, impl);
+    await markInProgress(taskId, 'Review');
     verdict = ensureAgentResult(taskId, await review(task, impl), 'reviewer');
     if (verdict.qualityVerdict === 'NEEDS_FIXES' || verdict.specVerdict === 'FAIL') {
       await appendLedger(`Task ${taskId}: blocked — review still failing after one fix round`);
@@ -567,6 +581,7 @@ async function executeTask(taskId) {
     }
   }
 
+  await markInProgress(taskId, 'Merge');
   const mergeResult = ensureAgentResult(
     taskId,
     await enqueueMainRepo(() =>
@@ -579,9 +594,11 @@ async function executeTask(taskId) {
         `${integrationBranch}\`. If it exits 0, branch task-${taskId} is ALREADY integrated: ` +
         `report mergeStatus MERGED with detail "already an ancestor, nothing to do" and do ` +
         `NOT run any merge command.\n\n` +
-        `Otherwise, merge branch task-${taskId} into branch ${integrationBranch} of repo ${repoPath}. Report ` +
-        `mergeStatus MERGED on success. If there is a real merge conflict, do not resolve it ` +
-        `automatically — stop and report mergeStatus CONFLICT with the conflict details in "detail".` +
+        `Otherwise, merge branch task-${taskId} into branch ${integrationBranch} of repo ${repoPath} ` +
+        `using \`git merge --no-ff\` — always create a merge commit, even when a fast-forward would ` +
+        `be possible, so every task's integration leaves a consistent, explicit commit regardless of ` +
+        `execution order. Report mergeStatus MERGED on success. If there is a real merge conflict, do ` +
+        `not resolve it automatically — stop and report mergeStatus CONFLICT with the conflict details in "detail".` +
         (mergeAuthorization
           // Piloto 2026-07-16, hallazgo F8: sin esto, el agente de merge no tiene forma de
           // saber que el usuario ya autorizó el run — algunos se autobloqueaban leyendo la

@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.10 — 2026-07-18
+
+New — retrospective from the Persons CRUD pilot (Spring Boot/MongoDB, run
+on another machine via Claude Code):
+
+- `.cys/state.json` now marks a task `in_progress` with its current
+  `phase` (`Implement`/`Review`/`Merge`) as it moves through execution,
+  instead of staying `pending` — indistinguishable from "hasn't started"
+  — for the task's entire run. Diagnostic only: `bin/plan-remainder.js`'s
+  resume semantics are unchanged, only `done` tasks are excluded either
+  way.
+- Task merges now always run `git merge --no-ff`, so every task leaves an
+  explicit merge commit — previously git could silently fast-forward
+  depending on execution order, producing an inconsistent history across
+  tasks of the same run.
+- `skills/check/references/code-standards.md` gained a "Data integrity"
+  section: an application-layer-only uniqueness check (no DB unique
+  index/constraint) is now an explicit review finding (TOCTOU), even when
+  the design spec only ruled out Bean-Validation-style annotations for
+  the check.
+- `cys:plan`'s self-review gained an "Exhaustive-coverage claims" rule:
+  if a spec says a test suite covers every case in a table, the plan must
+  enumerate each row as its own test step.
+- `cys:plan`'s self-review gained a "Version/toolchain enforcement" rule:
+  if Global Constraints pin an exact language/runtime version, at least
+  one task must mechanically enforce it, not just declare it in a config
+  file.
+
 ## 0.6.9 — 2026-07-18
 
 Fixed:
