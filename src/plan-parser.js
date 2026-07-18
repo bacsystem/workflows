@@ -90,14 +90,32 @@ const NO_SYMBOLS_RE = /^(none|n\/a|nothing)\b/i;
 
 function parseInterfaces(body, taskId, warnings) {
   const section = extractSection(body, INTERFACES_SECTION_RE);
+  const lines = section.split('\n');
   const interfaces = { consumes: [], produces: [] };
-  for (const line of section.split('\n')) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     const consumes = line.match(/^-\s*Consumes:\s*(.*)$/);
     const produces = line.match(/^-\s*Produces:\s*(.*)$/);
     const match = consumes ?? produces;
     if (!match) continue;
     const value = match[1].trim();
-    if (!value || NO_SYMBOLS_RE.test(value)) continue;
+    if (NO_SYMBOLS_RE.test(value)) continue;
+    if (!value) {
+      // Un valor vacío que no es "None"/"N/A"/"nothing" explícito casi siempre es un
+      // error de formato (p. ej. los símbolos anidados como sub-bullets en vez de en
+      // la misma línea) — nunca una omisión intencional. Bug real encontrado escribiendo
+      // un plan a mano: esto producía un grafo de dependencias completamente vacío sin
+      // un solo warning.
+      const kind = consumes ? 'Consumes' : 'Produces';
+      const nextLine = lines[i + 1] ?? '';
+      const hint = /^\s+-\s/.test(nextLine)
+        ? ` — did you mean to write "- ${kind}: \`symbol\`" per line instead of a nested list?`
+        : '';
+      warnings.push(
+        `Task ${taskId}: ${kind} line has no value after the colon and was ignored${hint}: "${line.trim()}"`
+      );
+      continue;
+    }
     const symbols = extractSymbols(value);
     if (symbols.length === 0) {
       // La línea tiene contenido pero ningún backtick: se ignora, pero avisando — una

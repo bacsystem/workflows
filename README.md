@@ -84,28 +84,56 @@ manual file copying needed.
 
 ### Cursor
 
-Unlike Claude Code, Cursor has no public, self-serve "install from any
-GitHub repo" command today. The only way to install cys as an individual
-(outside submitting it to Cursor's official, manually-reviewed
-Marketplace, or a Team/Enterprise admin's private import) is Cursor's own
-**local plugin development** mechanism:
+Cursor doesn't have a `/plugin marketplace add <repo>`-style command like
+Claude Code, but it does have a "from a local repo" install path in its
+own Settings UI (confirmed working — Cursor's plugin UI changed after
+this section was first written, so trust these steps over any older
+screenshot you find elsewhere):
 
 1. Clone this repo (see [Installation](#installation) below — for just
    the skills, cloning is enough, you don't need to build the workflow
    artifact or run its test suite).
-2. Link or copy the clone into Cursor's local plugins folder — the exact
-   path is `~/.cursor/plugins/local/<name>` per
-   [Cursor's plugin docs](https://cursor.com/docs/plugins); confirm the
-   equivalent on your OS (e.g. Windows: `%USERPROFILE%\.cursor\plugins\local\cys`).
-   A symlink is preferred over a copy so future `git pull`s stay picked up:
-   ```
-   ln -s /absolute/path/to/your/clone ~/.cursor/plugins/local/cys
-   ```
-3. Reload Cursor (Command Palette → "Developer: Reload Window") to pick
-   up the plugin.
+2. In Cursor: **Settings → Plugins** (or the **Customize** panel, if
+   your version has moved plugin management there) → **+ Add** →
+   **From Local Repo** → point it at your clone's absolute path.
+3. `cys` shows up under a "Bacsystem" group (from `plugin.json`'s
+   `author` field) with an **Add** button — click it. Once it says
+   **Added**, the skills are live, no reload needed.
 
-Once loaded, invoke skills the same way you would any other Cursor skill
-(e.g. `/design`, `/plan`).
+Invoke skills the same way you would any other Cursor skill (e.g.
+`/design`, `/plan`).
+
+<details>
+<summary>Fallback: symlink into Cursor's local plugins folder</summary>
+
+If your Cursor version doesn't have the "From Local Repo" flow, the
+older documented mechanism still works: link the clone into Cursor's
+local plugins folder (`~/.cursor/plugins/local/<name>` on macOS/Linux,
+per [Cursor's plugin docs](https://cursor.com/docs/plugins)). A symlink
+is preferred over a copy so future `git pull`s stay picked up — **always
+use the clone's absolute path as the link target**, not a relative one
+(a relative target resolves against the symlink's own directory, not
+wherever you ran the command from, and silently breaks):
+
+**macOS / Linux:**
+```
+mkdir -p ~/.cursor/plugins/local
+ln -s /absolute/path/to/your/clone ~/.cursor/plugins/local/cys
+```
+
+**Windows (PowerShell):**
+```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.cursor\plugins\local" | Out-Null
+New-Item -ItemType Junction -Path "$env:USERPROFILE\.cursor\plugins\local\cys" -Target "C:\absolute\path\to\your\clone"
+```
+A junction (`New-Item -ItemType Junction`, or `mklink /J` from `cmd.exe`)
+works without admin rights, unlike a regular directory symlink
+(`New-Item -ItemType SymbolicLink` / `mklink /D`), which needs either an
+elevated prompt or Developer Mode enabled.
+
+Then reload Cursor (Command Palette → "Developer: Reload Window") to
+pick it up.
+</details>
 
 ## Requirements
 

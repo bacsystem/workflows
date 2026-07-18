@@ -196,7 +196,7 @@ test('warns cuando una línea Consumes/Produces con contenido no tiene ningún b
   assert.match(warnings[0], /no backtick/);
 });
 
-test('no warnea por "None" ni por líneas vacías o correctamente backtickeadas', () => {
+test('no warnea por "None" ni por líneas correctamente backtickeadas', () => {
   const text = [
     '### Task 1: A',
     '',
@@ -209,13 +209,52 @@ test('no warnea por "None" ni por líneas vacías o correctamente backtickeadas'
     '### Task 2: B',
     '',
     '**Interfaces:**',
-    '- Consumes:',
+    '- Consumes: `makeA()`',
     '- Produces: `makeB()`',
     '',
     '- [ ] **Step 1: x**',
   ].join('\n');
   const { warnings } = parsePlanWithDiagnostics(text);
   assert.deepEqual(warnings, []);
+});
+
+// Bug real encontrado escribiendo un plan a mano: anidar los símbolos como sub-bullets
+// en vez de dejarlos en la misma línea dejaba "- Consumes:"/"- Produces:" con el valor
+// vacío — indistinguible del "None" intencional — y el grafo salía completamente vacío
+// sin un solo warning. Ver docs/cys/specs (o el reporte del usuario) para la evidencia.
+test('warns cuando Consumes/Produces queda vacío después de los dos puntos, con hint de nested-list si sigue un sub-bullet', () => {
+  const text = [
+    '### Task 1: A',
+    '',
+    '**Interfaces:**',
+    '- Consumes:',
+    '  - `some.Symbol`',
+    '- Produces: `makeB()`',
+    '',
+    '- [ ] **Step 1: x**',
+  ].join('\n');
+  const { tasks, warnings } = parsePlanWithDiagnostics(text);
+  assert.deepEqual(tasks[0].interfaces.consumes, []);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /Task 1/);
+  assert.match(warnings[0], /no value after the colon/);
+  assert.match(warnings[0], /nested list/);
+});
+
+test('warns (sin el hint de nested-list) cuando queda vacío sin un sub-bullet siguiente', () => {
+  const text = [
+    '### Task 1: A',
+    '',
+    '**Interfaces:**',
+    '- Consumes:',
+    '- Produces: `makeB()`',
+    '',
+    '- [ ] **Step 1: x**',
+  ].join('\n');
+  const { warnings } = parsePlanWithDiagnostics(text);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /no value after the colon/);
+  assert.doesNotMatch(warnings[0], /nested list/);
 });
 
 test('parses a plan with CRLF line endings identically to LF', () => {
