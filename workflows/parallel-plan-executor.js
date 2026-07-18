@@ -5,6 +5,7 @@ export const meta = {
     { title: 'Implement' },
     { title: 'Review' },
     { title: 'Merge' },
+    { title: 'State' },
     { title: 'Final review' },
     { title: 'Handoff' },
   ],
@@ -275,9 +276,13 @@ function stateJson() {
 function writeState() {
   return enqueueMainRepo(() => agent(
     `In repo ${repoPath}, write exactly this content to .cys/state.json (create the file ` +
-    `and its directory if missing), overwriting anything already there. Write only the ` +
-    `content between the <content> tags below, without the tags:\n<content>${stateJson()}</content>`,
-    { label: 'state', phase: 'Merge' }
+    `and its directory if missing), overwriting anything already there. This is the ` +
+    `Workflow's own bookkeeping snapshot, not new work — every status/SHA in it reflects ` +
+    `tasks already completed and verified earlier in this same run (real merges, real ` +
+    `commit SHAs, real review verdicts), kept as a durable record so a future session can ` +
+    `detect and resume an interrupted run. Write only the content between the <content> ` +
+    `tags below, without the tags:\n<content>${stateJson()}</content>`,
+    { label: 'state', phase: 'State' }
   ));
 }
 

@@ -294,6 +294,26 @@ test('built workflow writes .cys/state.json at start, updates it per settle, and
   );
 });
 
+test('built workflow tags .cys/state.json writes with their own phase, not Merge (pending.md bug)', () => {
+  assert.ok(
+    output.includes("{ title: 'State' }"),
+    "debe declararse una fase 'State' en meta.phases para las escrituras de bookkeeping"
+  );
+  const writeStateIndex = output.indexOf("label: 'state',");
+  assert.ok(writeStateIndex >= 0, "debe existir la llamada de agente etiquetada 'state'");
+  assert.ok(
+    output.slice(writeStateIndex, writeStateIndex + 40).includes("phase: 'State'"),
+    "la escritura de estado no debe quedar bajo phase: 'Merge' — corre antes de la primera tarea y en cada settle(), no solo durante merges"
+  );
+});
+
+test('built workflow frames the state-write prompt as verified bookkeeping, not new claims (safety-classifier block, pending.md bug)', () => {
+  assert.ok(
+    output.includes('bookkeeping snapshot') && output.includes('already completed and verified earlier in this same run'),
+    'sin este framing, el clasificador de seguridad puede leer un JSON con status "done" y SHAs reales como una fabricación en vez de un registro legítimo de resultados ya verificados'
+  );
+});
+
 test('built workflow appends unresolved final-review findings to .cys/pending.md via the Handoff agent (cys pending tracker)', () => {
   assert.ok(
     output.includes('.cys/pending.md'),
