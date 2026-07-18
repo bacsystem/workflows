@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parsePlanWithDiagnostics } from '../src/plan-parser.js';
 import { buildGraphWithDiagnostics } from '../src/graph-builder.js';
@@ -19,7 +19,19 @@ const state = JSON.parse(readFileSync(stateJsonPath, 'utf8'));
 // (LLM) puede juzgar dos formas de la misma ruta como equivalentes (relativa vs
 // absoluta, "./" adelante, separadores de Windows) y volver a invocar con un token
 // distinto al que quedó guardado en state.json. Final review, hallazgo Important #1.
-if (resolve(state.planPath) !== resolve(planPath)) {
+// realpathSync (no solo resolve): en macOS /var es symlink de /private/var, así que
+// process.cwd() en el hijo devuelve la forma canonicalizada mientras que el argumento
+// de la CLI puede llegar sin canonicalizar — mismo archivo real, string distinto.
+// resolve() no resuelve symlinks; realpathSync sí. Reportado por un usuario real
+// instalando en Mac.
+const resolvedPlanPath = realpathSync(resolve(planPath));
+let statePlanMatches;
+try {
+  statePlanMatches = realpathSync(resolve(state.planPath)) === resolvedPlanPath;
+} catch {
+  statePlanMatches = false; // state.planPath ya no existe — no es "el mismo plan"
+}
+if (!statePlanMatches) {
   console.error(`state.json is for a different plan ("${state.planPath}"), not "${planPath}"`);
   process.exit(1);
 }
