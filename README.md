@@ -69,6 +69,15 @@ target repo and an idea, and it walks the whole flow (design → plan →
 parallel run) with your approval gates at each stage. Use `/cys:run-plan`
 instead when an approved plan already exists.
 
+### Using cys on Cursor
+
+The five non-engine skills (`design`, `plan`, `check`, `ship`, `guide`)
+also work in [Cursor](https://cursor.com), reusing the exact same
+`skills/` directory — no forked copy to keep in sync. Install by pointing
+Cursor at this repo's `.cursor-plugin/`. `cys:run`'s parallel execution
+stays Claude-Code-only (see Requirements below): on Cursor, `cys:guide`
+tells you how to execute a plan's tasks yourself instead.
+
 ## Requirements
 
 - **[Claude Code](https://claude.com/claude-code)**, with access to the `Workflow` tool.
