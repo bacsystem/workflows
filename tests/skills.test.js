@@ -152,3 +152,24 @@ test('run-plan.md y flow.md ofrecen el texto de reintento manual (Routine Local)
     );
   }
 });
+
+test('.cursor-plugin/plugin.json comparte el mismo directorio de skills, sin fork (Cursor portability)', () => {
+  const cursorManifest = JSON.parse(readFileSync(path.join(root, '.cursor-plugin', 'plugin.json'), 'utf8'));
+  const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
+  assert.equal(cursorManifest.name, 'cys');
+  assert.equal(cursorManifest.skills, './skills/', 'debe apuntar al mismo directorio que usa Claude Code, sin fork');
+  assert.equal(
+    cursorManifest.version,
+    pkg.version,
+    'sin este candado, un bump de versión deja el manifest de Cursor desincronizado en silencio'
+  );
+});
+
+test('guide documenta la alternativa manual cuando cys:run no está disponible (Cursor)', () => {
+  const guide = readFileSync(path.join(skillsDir, 'guide', 'SKILL.md'), 'utf8');
+  assert.ok(
+    guide.includes('On Cursor,') &&
+      guide.includes('execute its tasks yourself in dependency order'),
+    'cys:guide debe explicar qué hacer cuando cys:run no está disponible (Cursor, por ahora)'
+  );
+});

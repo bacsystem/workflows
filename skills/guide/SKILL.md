@@ -36,6 +36,13 @@ just leaves `handoff.md` with suggestions, nothing pushed), or for any
 change that never went through `cys:run` at all. Running both after an
 `openPr: true` run would just duplicate the PR-creation work.
 
+**On Cursor, `cys:run` isn't available yet** — only stage 3's automated
+DAG scheduling, adversarial review, and serialized merging are
+Claude-Code-only. After `cys:plan` produces a plan there,
+execute its tasks yourself in dependency order: one at a time, or by
+hand-dispatching Cursor's own subagents per task, without cys:run's
+orchestration.
+
 ## Rules
 
 - `/cys:flow <repo> <idea>` runs the whole flow end to end; `/cys:run-plan`

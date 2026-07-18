@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.7 — 2026-07-18
+
+New — cys on Cursor (see `docs/cys/specs/2026-07-18-cursor-portability-design.md`):
+
+- `.cursor-plugin/plugin.json`: the five non-engine skills (`design`,
+  `plan`, `check`, `ship`, `guide`) are now installable in Cursor,
+  reusing the exact same `skills/` directory as the Claude Code plugin —
+  no forked copy to keep in sync.
+- `cys:guide` explains what to do when `cys:run` isn't available
+  (Cursor, for now): execute a plan's tasks yourself, without the
+  automated DAG scheduling, adversarial review, or serialized merging
+  that Claude Code's `cys:run` provides.
+- `README.md`/`README.es.md` document the new Cursor install path and
+  its scope (5 skills, not the parallel engine).
+
 ## 0.6.6 — 2026-07-18
 
 New (Fase 4c — see `docs/cys/specs/2026-07-18-fase-4c-manual-retry-guide-design.md`):
