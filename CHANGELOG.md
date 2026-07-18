@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.8 — 2026-07-18
+
+Fixed:
+
+- `bin/plan-remainder.js` compared plan paths with `path.resolve()`, which
+  never touches the filesystem and so can't see through symlinks. On
+  macOS, where `/var` is a symlink to `/private/var`, a resumed run's
+  `state.json` and the CLI's own `planPath` argument could point at the
+  exact same file yet resolve to two different strings, wrongly reporting
+  "a different plan." Now compared via `realpathSync(resolve(...))` on
+  both sides. Reported by a real user installing cys on macOS.
+
 ## 0.6.7 — 2026-07-18
 
 New — cys on Cursor (see `docs/cys/specs/2026-07-18-cursor-portability-design.md`):

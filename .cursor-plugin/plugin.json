@@ -1,6 +1,6 @@
 {
   "name": "cys",
-  "version": "0.6.7",
+  "version": "0.6.8",
   "description": "Development methodology skills for design, plan, check, and ship — parallel plan execution (cys:run) is Claude Code only for now.",
   "author": { "name": "bacsystem" },
   "repository": "https://github.com/bacsystem/parallel-plan-executor",

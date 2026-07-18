@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -131,6 +131,29 @@ test('el mismo plan con una forma de ruta distinta (relativa vs absoluta) no cue
     assert.deepEqual(result.tasks.map((t) => t.id), [2, 3]);
   } finally {
     process.chdir(originalCwd);
+  }
+});
+
+test('el mismo plan visto a través de un directorio symlinkeado no cuenta como "plan distinto" (reportado por un usuario instalando en Mac, donde /var -> /private/var)', (t) => {
+  const { dir, planPath } = makeFixtures();
+  const linkDir = path.join(tmpdir(), `plan-remainder-link-${process.pid}-${Date.now()}`);
+  try {
+    symlinkSync(dir, linkDir, 'junction');
+  } catch {
+    t.skip('el entorno no permite crear symlinks de directorio (falta de permisos)');
+    return;
+  }
+  try {
+    // state.json guarda la ruta vista a través del symlink; el argumento del CLI usa la
+    // ruta real (no symlinkeada) — mismo archivo en disco, dos strings distintos, igual
+    // que process.cwd() (canonicalizado por el SO) vs un argumento sin canonicalizar.
+    const statePath = writeState(dir, path.join(linkDir, 'plan.md'), { 1: { status: 'done' } });
+
+    const stdout = execFileSync('node', [cli, planPath, statePath], { encoding: 'utf8' });
+    const result = JSON.parse(stdout);
+    assert.deepEqual(result.tasks.map((t) => t.id), [2, 3]);
+  } finally {
+    rmSync(linkDir, { force: true });
   }
 });
 
