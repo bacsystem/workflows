@@ -275,13 +275,15 @@ function stateJson() {
 
 function writeState() {
   return enqueueMainRepo(() => agent(
-    `In repo ${repoPath}, write exactly this content to .cys/state.json (create the file ` +
-    `and its directory if missing), overwriting anything already there. This is the ` +
-    `Workflow's own bookkeeping snapshot, not new work — every status/SHA in it reflects ` +
-    `tasks already completed and verified earlier in this same run (real merges, real ` +
-    `commit SHAs, real review verdicts), kept as a durable record so a future session can ` +
-    `detect and resume an interrupted run. Write only the content between the <content> ` +
-    `tags below, without the tags:\n<content>${stateJson()}</content>`,
+    `Run \`date +%H:%M:%S\` first to get the current time. In repo ${repoPath}, write to ` +
+    `.cys/state.json (create the file and its directory if missing, overwriting anything ` +
+    `already there) the content between the <content> tags below, but with ` +
+    `"updatedAt": "<time from date>" inserted as a top-level field right after ` +
+    `"integrationBranch". This is the Workflow's own bookkeeping snapshot, not new work — ` +
+    `every status/SHA in it reflects tasks already completed and verified earlier in this same run ` +
+    `(real merges, real commit SHAs, real review verdicts), kept as a durable record so a ` +
+    `future session can detect and resume an interrupted run. Write nothing else, no ` +
+    `commentary:\n<content>${stateJson()}</content>`,
     { label: 'state', phase: 'State' }
   ));
 }
@@ -498,19 +500,22 @@ async function handoff(finalReview) {
     `commits and the commits they brought in. Derive the dominant Conventional ` +
     `Commit type and propose a SemVer bump per git-flow rules (>=1.0: feat=minor, fix=patch, ` +
     `BREAKING=major; 0.x: BREAKING=minor, everything else=patch). Report it as versionBump.\n\n` +
-    `2. Write ${repoPath}/.cys/handoff.md containing: a suggested PR title ` +
-    `(Conventional Commit subject covering the run), a PR body with Summary / Type of change / ` +
-    `Main changes (one bullet per task) / Version / Checklist sections, the final review ` +
-    `verdict quoted below, and a post-run cleanup checklist (merged task-N branches to delete, ` +
-    `what to do with ${integrationBranch} after the PR merges). Report its path as handoffFile.\n\n` +
-    `3. Classify every finding in the final review above that is still unresolved (Minor ` +
+    `2. Classify every finding in the final review below that is still unresolved (Minor ` +
     `findings are expected to stay open; also include any Important/Critical finding the user ` +
     `explicitly chose not to fix). For each: append one line to ${repoPath}/.cys/pending.md, ` +
     `under "## Bugs" for broken/incorrect behavior or "## Gaps" for missing/deferred scope — ` +
     `create the file first with this exact skeleton if it does not exist yet:\n` +
     `"# Pendientes\\n\\n## Bugs\\n\\n## Gaps\\n\\n## Tareas\\n". Keep the finding's own wording ` +
-    `and file:line reference; never touch "## Tareas". Report how many items you appended as ` +
-    `pendingLogged (0 if every finding was already resolved).\n\n` +
+    `and file:line reference; never touch "## Tareas". Count how many items you appended as ` +
+    `pendingLogged (0 if every finding was already resolved) — you need this number for step ` +
+    `3 below.\n\n` +
+    `3. Write ${repoPath}/.cys/handoff.md containing: a suggested PR title ` +
+    `(Conventional Commit subject covering the run), a PR body with Summary / Type of change / ` +
+    `Main changes (one bullet per task) / Version / Checklist sections, the final review ` +
+    `verdict quoted below, a line stating the pendingLogged count from step 2 (how many ` +
+    `findings were appended to .cys/pending.md, or that none were), and a post-run cleanup ` +
+    `checklist (merged task-N branches to delete, what to do with ${integrationBranch} after ` +
+    `the PR merges). Report its path as handoffFile.\n\n` +
     (wantPr
       ? `4. Push ${integrationBranch} to the remote and create the pull request: ` +
         `\`gh pr create --base ${prArgs.base ?? 'develop'} --head ${integrationBranch}\` with the ` +
