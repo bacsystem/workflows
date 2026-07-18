@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.5 — 2026-07-17
+
+New (Fase 4b — see `docs/cys/specs/2026-07-17-fase-4b-state-recovery-design.md`):
+
+- `.cys/state.json`: the engine writes a full per-task status snapshot
+  at start and after every task settles, and deletes it only once the
+  script reaches its own natural end — its mere presence signals a run
+  got cut off before finishing, not that something failed normally.
+- `bin/plan-remainder.js`: deterministic CLI that reduces a plan +
+  `state.json` to only what's left, for `/cys:run-plan` to resume with.
+- `/cys:flow` and `/cys:run-plan` detect leftover `.cys/state.json` and
+  offer to resume instead of starting over.
+
+Fixed (post-review, same branch — the whole-branch review's two
+Important findings, resolved before merge):
+
+- `bin/plan-remainder.js` now compares `planPath` via resolved paths
+  instead of a literal string, so a command's LLM-judged "same plan"
+  match (e.g. relative vs. absolute, backslashes on Windows) can't be
+  rejected by a stricter downstream check.
+- A run interrupted after every task merged but before Final
+  Review/Handoff completed can now be resumed: `bin/plan-remainder.js`
+  reports `allDone: true` in that case, and `args.finishOnly` (new,
+  optional) tells the engine to skip straight to Final Review/Handoff
+  instead of requiring a non-empty task list.
+
+Known follow-ups (documented, not yet fixed): the design spec's
+`updatedAt` field was dropped from `state.json` without being explicitly
+descoped; the initial `state.json` write is mislabeled under the
+`Merge` phase; the README doesn't yet document `bin/plan-remainder.js`
+or the resume flow.
+
 ## 0.6.4 — 2026-07-17
 
 Fixed (Fase 4a — see `docs/cys/specs/2026-07-17-fase-4a-quick-fixes-design.md`):

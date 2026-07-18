@@ -15,6 +15,19 @@ test('rechaza tasks vacío o ausente', () => {
   assert.throws(() => validateWorkflowArgs({ tasks: undefined, graph: {}, ...BRANCH }), /non-empty array/);
 });
 
+test('acepta tasks vacío cuando finishOnly es true — toda la corrida ya se mergeó, solo falta el cierre (final review, hallazgo Important #2)', () => {
+  assert.doesNotThrow(() =>
+    validateWorkflowArgs({ tasks: [], graph: {}, ...BRANCH, finishOnly: true })
+  );
+});
+
+test('rechaza finishOnly no-booleano', () => {
+  assert.throws(
+    () => validateWorkflowArgs({ tasks: [], graph: {}, ...BRANCH, finishOnly: 'yes' }),
+    /finishOnly/
+  );
+});
+
 test('rechaza un graph ausente', () => {
   assert.throws(() => validateWorkflowArgs({ tasks: [{ id: 1, title: 'A' }], graph: null, ...BRANCH }), /must be an object/);
 });

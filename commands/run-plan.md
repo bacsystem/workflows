@@ -56,11 +56,18 @@ REPO = `${CLAUDE_PLUGIN_ROOT}`
    `node REPO/bin/plan-remainder.js <plan-path> <repo-path>/.cys/state.json`
    instead of the command below. Otherwise, run
    `node bin/parse-plan.js <plan-path>` from `REPO`. Either way, capture
-   stdout as JSON (`{ tasks, graph, warnings }`). Show any warnings to
-   the user — in particular a duplicate-producer warning or an empty
-   graph is worth surfacing before launching, not after.
+   stdout as JSON (`{ tasks, graph, warnings, allDone? }`). Show any
+   warnings to the user — in particular a duplicate-producer warning or
+   an empty graph is worth surfacing before launching, not after.
+   - If `allDone` is `true` (only present when resuming): every task was
+     already merged in the earlier run — nothing to implement, only the
+     final whole-branch review and handoff never finished. Tell the user
+     this, skip steps 5 and 7 below (no new merges, no new branch), and
+     launch (step 8) with `finishOnly: true` and empty `tasks`/`graph`
+     instead of what `plan-remainder.js` printed for those two fields.
 
-5. **Ask what's still missing**, in plain language, one question at a time:
+5. **Ask what's still missing** (skip this step if `allDone` was `true`),
+   in plain language, one question at a time:
    - Whether to push and open a PR at the end (`openPr`), and if so, the PR base branch
      (`pr.base`) and any optional fields (`assignees`, `labels`, `milestone`, `closes`).
    - **Their explicit merge authorization**, naming the branches (e.g. "I authorize
@@ -74,7 +81,8 @@ REPO = `${CLAUDE_PLUGIN_ROOT}`
    openPr/PR settings, and confirm the authorization text with the user. This is a real
    run against their repo — don't skip the confirmation.
 
-7. **Create the integration branch if it doesn't exist**: run
+7. **Create the integration branch if it doesn't exist** (skip if `allDone`
+   was `true` — the branch already has everything merged on it): run
    `git -C <repo-path> show-ref --verify --quiet
    refs/heads/<integration-branch>`. If it exits non-zero, create it from `develop`:
    `git -C <repo-path> branch <integration-branch> develop`. If
@@ -83,7 +91,8 @@ REPO = `${CLAUDE_PLUGIN_ROOT}`
 
 8. **Launch**: invoke the `Workflow` tool with:
    - `scriptPath`: `<REPO>/workflows/parallel-plan-executor.js`
-   - `args`: `{ tasks, graph, planPath, repoPath, integrationBranch, executorPath: <REPO>, openPr, pr, mergeAuthorization }`
+   - `args`: if `allDone` was `true`, `{ tasks: [], graph: {}, planPath, repoPath, integrationBranch, executorPath: <REPO>, finishOnly: true, openPr, pr }` (no `mergeAuthorization` — nothing merges in this mode). Otherwise,
+     `{ tasks, graph, planPath, repoPath, integrationBranch, executorPath: <REPO>, openPr, pr, mergeAuthorization }`
      (executorPath is REPO — the workflow invokes REPO/bin scripts by exact path;
      omit `openPr`/`pr`/`mergeAuthorization` if not provided)
 

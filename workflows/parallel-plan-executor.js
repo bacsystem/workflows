@@ -157,9 +157,16 @@ function assertAcyclic(graph) {
 // un ciclo en ese grafo deja a runDag esperando su propia promesa memoizada para
 // siempre — deadlock sin error ni log. Esta validación corre antes de lanzar cualquier
 // agente para que el fallo sea inmediato y explicable.
-function validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization }) {
-  if (!Array.isArray(tasks) || tasks.length === 0) {
-    throw new Error('args.tasks must be a non-empty array');
+function validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly }) {
+  if (finishOnly !== undefined && typeof finishOnly !== 'boolean') {
+    throw new Error('args.finishOnly must be a boolean when present');
+  }
+  if (!Array.isArray(tasks) || (tasks.length === 0 && !finishOnly)) {
+    // finishOnly: true es la única excepción a "no vacío" — bin/plan-remainder.js marca
+    // allDone cuando ya no queda ninguna tarea pendiente/fallida (todo se mergeó antes de
+    // que la corrida se cortara) y solo falta terminar la revisión final + el handoff.
+    // Final review, hallazgo Important #2.
+    throw new Error('args.tasks must be a non-empty array (unless args.finishOnly is true)');
   }
   if (!graph || typeof graph !== 'object') {
     throw new Error('args.graph must be an object');
@@ -249,8 +256,8 @@ function formatDuration(startedAt, finishedAt) {
 // invocado la tool (comprobado en el piloto 2026-07-15): destructurar el string daba
 // tasks undefined y un error que culpaba al campo equivocado.
 const resolvedArgs = typeof args === 'string' ? JSON.parse(args) : args;
-const { graph, tasks, planPath, repoPath, integrationBranch, executorPath, openPr, pr, mergeAuthorization } = resolvedArgs;
-validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization }); // falla rápido y claro, nunca deadlock
+const { graph, tasks, planPath, repoPath, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly } = resolvedArgs;
+validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly }); // falla rápido y claro, nunca deadlock
 const tasksById = new Map(tasks.map((t) => [t.id, t]));
 
 // Fase 4b: snapshot completo del estado de cada tarea, para que una sesión futura (no
@@ -593,14 +600,23 @@ async function executeTask(taskId) {
   return impl;
 }
 
-await writeState();
-const results = await runDag(graph, runTask);
+// finishOnly (Fase 4b, hallazgo Important #2 de la revisión final): bin/plan-remainder.js
+// marca allDone cuando una corrida anterior ya mergeó todas las tareas y se cortó antes
+// de llegar a la revisión final/handoff — acá no hay nada que implementar ni mergear, así
+// que se saltea el DAG entero y se va directo a esa parte, en vez de fallar por falta de
+// tareas o repetir trabajo ya hecho.
+let results = new Map();
+if (!finishOnly) {
+  await writeState();
+  results = await runDag(graph, runTask);
+  // Las tareas skipped nunca pasan por runTask; reconciliar para que la barra cierre en N/N.
+  settledCount = results.size;
+  log(`${progressBar()} — ejecución terminada`);
+} else {
+  log('finishOnly: no hay tareas que ejecutar — todo se mergeó en una corrida anterior, solo falta la revisión final y el handoff.');
+}
 
-// Las tareas skipped nunca pasan por runTask; reconciliar para que la barra cierre en N/N.
-settledCount = results.size;
-log(`${progressBar()} — ejecución terminada`);
-
-const mergedCount = [...results.values()].filter((r) => r.status === 'done').length;
+const mergedCount = finishOnly ? 1 : [...results.values()].filter((r) => r.status === 'done').length;
 let finalReview = null;
 let handoffResult = null;
 if (mergedCount > 0) {

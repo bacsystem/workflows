@@ -112,6 +112,56 @@ test('falla ruidosamente si el planPath de state.json no coincide', () => {
   );
 });
 
+test('el mismo plan con una forma de ruta distinta (relativa vs absoluta) no cuenta como "plan distinto" (final review, hallazgo Important #1)', () => {
+  const { dir, planPath } = makeFixtures();
+  // state.json guarda una ruta relativa con "./" adelante; el argumento del CLI es la
+  // ruta absoluta — ambas apuntan al mismo archivo real.
+  const relativePlanPath = './' + path.relative(dir, planPath).split(path.sep).join('/');
+  const statePath = path.join(dir, 'state.json');
+  writeFileSync(
+    statePath,
+    JSON.stringify({ planPath: relativePlanPath, tasks: { 1: { status: 'done' } } })
+  );
+
+  const originalCwd = process.cwd();
+  process.chdir(dir);
+  try {
+    const stdout = execFileSync('node', [cli, planPath, statePath], { encoding: 'utf8' });
+    const result = JSON.parse(stdout);
+    assert.deepEqual(result.tasks.map((t) => t.id), [2, 3]);
+  } finally {
+    process.chdir(originalCwd);
+  }
+});
+
+test('si todas las tareas ya estaban done, la salida marca allDone para que el comando ofrezca terminar solo el cierre (final review, hallazgo Important #2)', () => {
+  const { dir, planPath } = makeFixtures();
+  const statePath = writeState(dir, planPath, {
+    1: { status: 'done' },
+    2: { status: 'done' },
+    3: { status: 'done' },
+  });
+
+  const stdout = execFileSync('node', [cli, planPath, statePath], { encoding: 'utf8' });
+  const result = JSON.parse(stdout);
+
+  assert.equal(result.allDone, true);
+});
+
+test('allDone es false mientras quede algo pendiente o fallido', () => {
+  const { dir, planPath } = makeFixtures();
+  const statePath = writeState(dir, planPath, {
+    1: { status: 'done' },
+    2: { status: 'failed' },
+    3: { status: 'pending' },
+  });
+
+  const stdout = execFileSync('node', [cli, planPath, statePath], { encoding: 'utf8' });
+  const result = JSON.parse(stdout);
+
+  assert.equal(result.allDone, false);
+});
+
 test('falla ruidosamente sin args', () => {
   assert.throws(() => execFileSync('node', [cli], { encoding: 'utf8', stdio: 'pipe' }));
 });

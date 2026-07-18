@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { parsePlanWithDiagnostics } from '../src/plan-parser.js';
 import { buildGraphWithDiagnostics } from '../src/graph-builder.js';
 
@@ -14,7 +15,11 @@ const { tasks, warnings: parseWarnings } = parsePlanWithDiagnostics(planText);
 const { graph, warnings: graphWarnings } = buildGraphWithDiagnostics(tasks);
 
 const state = JSON.parse(readFileSync(stateJsonPath, 'utf8'));
-if (state.planPath !== planPath) {
+// Comparación por ruta resuelta, no por string literal: un comando que compara "a ojo"
+// (LLM) puede juzgar dos formas de la misma ruta como equivalentes (relativa vs
+// absoluta, "./" adelante, separadores de Windows) y volver a invocar con un token
+// distinto al que quedó guardado en state.json. Final review, hallazgo Important #1.
+if (resolve(state.planPath) !== resolve(planPath)) {
   console.error(`state.json is for a different plan ("${state.planPath}"), not "${planPath}"`);
   process.exit(1);
 }
@@ -33,9 +38,17 @@ for (const task of remainingTasks) {
   remainingGraph[task.id] = (graph[task.id] ?? []).filter((depId) => !doneIds.has(depId));
 }
 
+// Un remanente vacío es ambiguo por sí solo: puede ser "no queda nada porque ya se
+// mergeó todo, solo falta el cierre" (recuperable) o un plan sin tareas (error). Como
+// tasks.length siempre es > 0 acá (parsePlanWithDiagnostics ya lo garantiza), un
+// remainingTasks vacío solo puede significar la primera opción — se lo marcamos
+// explícito al llamador en vez de dejarlo inferir de una lista vacía. Final review,
+// hallazgo Important #2.
+const allDone = remainingTasks.length === 0;
+
 const warnings = [...parseWarnings, ...graphWarnings];
 // Warnings a stderr: stdout es el JSON que se pipea y debe quedar limpio.
 for (const warning of warnings) {
   console.error(`WARNING: ${warning}`);
 }
-console.log(JSON.stringify({ tasks: remainingTasks, graph: remainingGraph, warnings }, null, 2));
+console.log(JSON.stringify({ tasks: remainingTasks, graph: remainingGraph, warnings, allDone }, null, 2));
