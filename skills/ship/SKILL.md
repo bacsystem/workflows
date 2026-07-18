@@ -18,6 +18,13 @@ with the user at the review, doc-update, and PR steps.
 - User says "ship this", "commit and open a PR", "create the PR".
 - A feature or fix is finished and needs a branch + commit + PR.
 
+**Not needed after a `cys:run` (parallel-plan-executor) run launched with
+`openPr: true`** — that run's own Handoff agent already did this (same
+conventions, hand-rolled in its prompt because the sandboxed `Workflow`
+script can't invoke skills). Use `cys:ship` when `cys:run` ran *without*
+`openPr: true` (it only leaves `handoff.md` with suggestions, nothing
+pushed) or for any change that never went through `cys:run` at all.
+
 Skip when: the user only wants a quick local commit with no review/PR.
 
 ## Conventions

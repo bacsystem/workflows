@@ -107,3 +107,16 @@ test('cada comando del plugin tiene frontmatter con description', () => {
     assert.ok(fm.description && fm.description.length >= 20, `commands/${file}: la description guía la invocación`);
   }
 });
+
+test('guide y ship documentan que se superponen cuando cys:run corre con openPr: true', () => {
+  const guide = readFileSync(path.join(skillsDir, 'guide', 'SKILL.md'), 'utf8');
+  const ship = readFileSync(path.join(skillsDir, 'ship', 'SKILL.md'), 'utf8');
+  assert.ok(
+    guide.includes('openPr: true') && guide.includes('Handoff agent'),
+    'cys:guide debe explicar cuándo cys:ship es redundante con el Handoff automático'
+  );
+  assert.ok(
+    ship.includes('openPr: true') && ship.includes('Not needed'),
+    'cys:ship debe aclarar que no hace falta invocarlo si cys:run ya abrió el PR solo'
+  );
+});

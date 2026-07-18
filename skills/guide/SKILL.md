@@ -25,6 +25,17 @@ every task (adversarial review, one fix round); invoke it standalone for
 ad-hoc reviews. Stage 5's PR merge is always a human gate — agents never
 merge PRs.
 
+**Stage 5 overlaps with stage 3 when `openPr: true` was requested.** The
+Workflow's own Handoff agent (part of stage 3) already does everything
+`cys:ship` would do — classify commits, compute the SemVer bump, write
+the PR title/body, push, create the PR — because the sandboxed `Workflow`
+script cannot invoke the `Skill` tool itself, so it carries a hand-rolled
+copy of the same conventions instead of calling `cys:ship` directly.
+Invoke `cys:ship` **only** when stage 3 ran without `openPr: true` (it
+just leaves `handoff.md` with suggestions, nothing pushed), or for any
+change that never went through `cys:run` at all. Running both after an
+`openPr: true` run would just duplicate the PR-creation work.
+
 ## Rules
 
 - `/cys:flow <repo> <idea>` runs the whole flow end to end; `/cys:run-plan`
