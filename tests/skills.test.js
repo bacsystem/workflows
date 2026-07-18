@@ -197,3 +197,14 @@ test('plan exige forzar mecánicamente una versión de lenguaje/runtime fijada e
     'cys:plan debe exigir que una versión fijada en Global Constraints quede forzada mecánicamente, no solo declarada'
   );
 });
+
+test('los comandos aseguran que .cys/ esté en .gitignore del repo destino antes de lanzar (hallazgo real: 21 archivos untracked listos para commitearse por accidente)', () => {
+  const flow = readFileSync(path.join(root, 'commands', 'flow.md'), 'utf8');
+  const runPlan = readFileSync(path.join(root, 'commands', 'run-plan.md'), 'utf8');
+  for (const [name, content] of [['flow.md', flow], ['run-plan.md', runPlan]]) {
+    assert.ok(
+      content.includes('Ensure `.cys/` is gitignored'),
+      `commands/${name} debe verificar y asegurar que .cys/ esté en .gitignore antes de que el run escriba ahí`
+    );
+  }
+});

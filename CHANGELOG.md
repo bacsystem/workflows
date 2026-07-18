@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.11 — 2026-07-18
+
+Fixed:
+
+- `commands/flow.md` / `commands/run-plan.md`: both now ensure
+  `<repo-path>/.gitignore` has a `.cys/` entry (adding and committing it
+  if missing) right before launching. cys never checked this before —
+  it only "worked" in this repo because `.gitignore` here was set up by
+  hand. Any other target project had no protection: task briefs/reports,
+  review diffs, `handoff.md`, `pending.md`, and `progress.md` were one
+  `git add .` away from landing in the project's history. Reported by a
+  real user who found 21 untracked `.cys/*` files ready to be committed
+  on a project that had never had this checked.
+
 ## 0.6.10 — 2026-07-18
 
 New — retrospective from the Persons CRUD pilot (Spring Boot/MongoDB, run

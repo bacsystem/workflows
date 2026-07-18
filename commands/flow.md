@@ -88,18 +88,28 @@ REPO = `${CLAUDE_PLUGIN_ROOT}`
    it exits 0, the branch already exists — step 8 already handled
    confirming that with the user, nothing more to do here.
 
-10. **Launch** the `Workflow` tool with:
+10. **Ensure `.cys/` is gitignored**: check whether `<repo-path>/.gitignore`
+    already has a `.cys/` entry (a line matching `.cys/`, `.cys`, or a
+    broader pattern that already covers it). If not, append `.cys/` to
+    `.gitignore` (create the file if it doesn't exist) and commit that
+    one-line addition now, before the run writes anything there — task
+    briefs/reports, review diffs, `handoff.md`, `pending.md`, and
+    `progress.md` should never risk landing in the target repo's history.
+    Reported by a real user who found 21 untracked `.cys/*` files sitting
+    in a project that had never had this checked.
+
+11. **Launch** the `Workflow` tool with:
    - `scriptPath`: `REPO/workflows/parallel-plan-executor.js`
    - `args`: `{ tasks, graph, planPath, repoPath, integrationBranch,
      executorPath: REPO, openPr, pr, mergeAuthorization }` (omit the
      optional ones not provided).
 
-11. **After launching**: tell the user it runs in the background, that
+12. **After launching**: tell the user it runs in the background, that
    they can ask "how's the workflow going?" or open `/workflows`, and
    that merges may pause for their permission dialog — a click there is
    expected, not a failure.
 
-12. **Offer the manual retry guide**: ask one question, in plain
+13. **Offer the manual retry guide**: ask one question, in plain
     language — whether they want the copy-paste text for a Claude Code
     Desktop Local Routine that resumes this run unattended if it gets cut
     short. On "no", stop here. On "yes", print this block, filling in
