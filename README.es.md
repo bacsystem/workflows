@@ -30,8 +30,8 @@ que se describe a continuación.
 ## El plugin cys
 
 **cys** es el plugin de skills de este repo: cinco skills que cubren el flujo completo
-**design → plan → run → check → ship**, nombrado en honor a las hijas gemelas del
-autor, **Cielo y Sophia**.
+**design → plan → run → check → ship**, creado por Christian Bacilio y nombrado en
+honor a sus hijas gemelas, **Cielo y Sophia**.
 
 | Skill | Qué hace |
 |---|---|
@@ -507,3 +507,16 @@ del clasificador.
 - Las ramas `task-<id>` de tareas fallidas o BLOCKED sobreviven a la corrida a propósito:
   preservan el estado parcial que exista para diagnóstico. Límpialas después con
   `git branch -D task-<id>` cuando ya no las necesites.
+
+## Reportar un bug
+
+Abrí un issue en
+[github.com/bacsystem/parallel-plan-executor/issues](https://github.com/bacsystem/parallel-plan-executor/issues)
+(la plantilla te va a guiar). Lo más útil que podés adjuntar es algo que
+cys ya generó solo — no hace falta armar una repro desde cero:
+
+- `.cys/pending.md`, si la revisión final de la corrida o un `cys:check`
+  ya registró un hallazgo sobre esto.
+- `.cys/task-<id>-report.md`, de la tarea específica que falló.
+- `review-*.diff`, si una revisión marcó algo.
+- El stderr/stdout exacto de un comando que falló (ej. `node bin/parse-plan.js`).
