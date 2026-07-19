@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { parsePlan } from '../src/plan-parser.js';
-import { buildGraph, buildGraphWithDiagnostics, assertAcyclic } from '../src/graph-builder.js';
+import { buildGraph, buildGraphWithDiagnostics, assertAcyclic, computeParallelWidth } from '../src/graph-builder.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -116,4 +116,20 @@ test('builds a real graph from a business-core plan excerpt', () => {
   const tasks = parsePlan(excerpt);
   const graph = buildGraph(tasks);
   assert.equal(Object.keys(graph).length, tasks.length);
+});
+
+test('computeParallelWidth: tres tareas independientes da ancho 3', () => {
+  assert.equal(computeParallelWidth({ 1: [], 2: [], 3: [] }), 3);
+});
+
+test('computeParallelWidth: una cadena lineal da ancho 1', () => {
+  assert.equal(computeParallelWidth({ 1: [], 2: [1], 3: [2] }), 1);
+});
+
+test('computeParallelWidth: un diamante (2 base + 1 dependiente) da ancho 2', () => {
+  assert.equal(computeParallelWidth({ 1: [], 2: [], 3: [1, 2] }), 2);
+});
+
+test('computeParallelWidth: grafo vacío da ancho 0', () => {
+  assert.equal(computeParallelWidth({}), 0);
 });

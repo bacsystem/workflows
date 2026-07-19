@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.18 — 2026-07-19
+
+Added:
+
+- `cys:run`'s final summary now reports run stats: task outcome counts
+  (done/failed/skipped), the plan's inferred parallel width (via the new
+  `computeParallelWidth(graph)` in `src/graph-builder.js`), and — for
+  runs with at least one done task — sequential-equivalent work (sum of
+  each done task's own duration) alongside the wall-clock window (first
+  start to last finish). No fabricated "speedup" number: agent-reported
+  timestamps aren't a monotonic clock, so the summary shows both numbers
+  and lets them speak.
+
+Last of the four branches from the same external code-review prompt
+(dated 2026-07-19) — see `docs/cys/specs/2026-07-19-run-summary-design.md`.
+
 ## 0.6.17 — 2026-07-19
 
 Added:

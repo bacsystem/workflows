@@ -198,6 +198,23 @@ function assertAcyclic(graph) {
   }
 }
 
+function computeParallelWidth(graph) {
+  const layer = new Map();
+  function layerOf(id) {
+    if (layer.has(id)) return layer.get(id);
+    const deps = graph[id] ?? [];
+    const value = deps.length === 0 ? 0 : 1 + Math.max(...deps.map(layerOf));
+    layer.set(id, value);
+    return value;
+  }
+  const counts = new Map();
+  for (const id of Object.keys(graph).map(Number)) {
+    const l = layerOf(id);
+    counts.set(l, (counts.get(l) ?? 0) + 1);
+  }
+  return Math.max(0, ...counts.values());
+}
+
 
 // El workflow recibe tasks/graph como JSON pegado a mano por el usuario (ver README);
 // un ciclo en ese grafo deja a runDag esperando su propia promesa memoizada para
@@ -738,6 +755,39 @@ const summaryLines = [...results.entries()].map(([id, r]) => {
   return `Task ${id}: skipped — ${r.reason}`;
 });
 log(summaryLines.join('\n'));
+
+const doneResults = [...results.values()].filter((r) => r.status === 'done');
+const outcomeCounts = {
+  done: doneResults.length,
+  failed: [...results.values()].filter((r) => r.status === 'failed').length,
+  skipped: [...results.values()].filter((r) => r.status === 'skipped').length,
+};
+const statsLines = [
+  `Tasks: ${results.size} total — ${outcomeCounts.done} done, ${outcomeCounts.failed} failed, ${outcomeCounts.skipped} skipped`,
+  `Plan's inferred parallel width: ${computeParallelWidth(graph)} (largest set of tasks with no dependency between them)`,
+];
+if (doneResults.length > 0) {
+  const durations = doneResults
+    .map((r) => hhmmssToSeconds(r.result?.finishedAt) - hhmmssToSeconds(r.result?.startedAt))
+    .map((secs) => (secs < 0 ? secs + 24 * 3600 : secs))
+    .filter((secs) => Number.isFinite(secs));
+  const sequentialEquivalentSecs = durations.reduce((sum, secs) => sum + secs, 0);
+  const starts = doneResults.map((r) => hhmmssToSeconds(r.result?.startedAt)).filter((s) => s !== null);
+  const ends = doneResults.map((r) => hhmmssToSeconds(r.result?.finishedAt)).filter((s) => s !== null);
+  if (starts.length > 0 && ends.length > 0) {
+    let wallClockSecs = Math.max(...ends) - Math.min(...starts);
+    if (wallClockSecs < 0) wallClockSecs += 24 * 3600;
+    // Sin Nx inventado: los tiempos vienen de `date` reportado por cada agente, no de un
+    // reloj monotónico — se muestran los dos números y que el usuario saque su conclusión.
+    statsLines.push(
+      `Sequential-equivalent work (sum of each done task's own duration): ` +
+      `${Math.floor(sequentialEquivalentSecs / 60)}m${String(sequentialEquivalentSecs % 60).padStart(2, '0')}s — ` +
+      `vs. wall-clock window (first start to last finish): ` +
+      `${Math.floor(wallClockSecs / 60)}m${String(wallClockSecs % 60).padStart(2, '0')}s`
+    );
+  }
+}
+log(statsLines.join('\n'));
 if (finalReview) log(`Final whole-branch review:\n${finalReview}`);
 
 // Un Error de JS serializa a {} al pasar por JSON: sin este mapeo, el objeto retornado

@@ -122,3 +122,20 @@ export function assertAcyclic(graph) {
     }
   }
 }
+
+export function computeParallelWidth(graph) {
+  const layer = new Map();
+  function layerOf(id) {
+    if (layer.has(id)) return layer.get(id);
+    const deps = graph[id] ?? [];
+    const value = deps.length === 0 ? 0 : 1 + Math.max(...deps.map(layerOf));
+    layer.set(id, value);
+    return value;
+  }
+  const counts = new Map();
+  for (const id of Object.keys(graph).map(Number)) {
+    const l = layerOf(id);
+    counts.set(l, (counts.get(l) ?? 0) + 1);
+  }
+  return Math.max(0, ...counts.values());
+}
