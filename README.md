@@ -10,10 +10,109 @@ executors do.
 The **generated code** is technology-agnostic — validated against both Node and
 Java/Spring Boot projects, nothing in the design is tied to a specific language.
 
+## Table of contents
+
+- [What is cys?](#what-is-cys)
+- [See it in action (60 seconds)](#see-it-in-action-60-seconds)
+- [Quick Start](#quick-start)
+- [Installing the cys plugin](#installing-the-cys-plugin)
+- [One-time permissions setup (merges)](#one-time-permissions-setup-merges)
+- [Using cys](#using-cys)
+- [Building from source](#building-from-source)
+- [How it works](#how-it-works)
+- [Safety checks & known limitations](#safety-checks--known-limitations)
+- [Reporting bugs & contributing](#reporting-bugs--contributing)
+
+## What is cys?
+
+**cys** is two things, sharing one repo:
+
+1. **A portable plugin** — five skills covering the whole flow
+   **design → plan → run → check → ship**, created by Christian Bacilio and named
+   after his twin daughters, **Cielo y Sophia**. Four of the five skills are plain
+   Markdown with no Claude-Code-specific coupling, so the same `skills/` directory
+   works as-is on Claude Code, Cursor, and Gemini CLI — see
+   [Installing the cys plugin](#installing-the-cys-plugin).
+2. **`cys:run`, the parallel execution engine** (this repo's `Workflow` script) —
+   the actual differentiator, and **Claude Code only**. It's a `Workflow` script,
+   a third kind of Claude Code extension distinct from plugins and skills: you
+   invoke it by absolute path (`scriptPath: <clone>/workflows/parallel-plan-executor.js`),
+   it can't pause mid-run to ask you anything, and everything it produces —
+   task briefs, review verdicts, `.cys/handoff.md` — is written to disk instead.
+
+| Skill | What it does |
+|---|---|
+| `cys:design` | idea → spec |
+| `cys:plan` | spec → implementation plan |
+| `cys:run` | this repo's `Workflow` — launched via `/cys:run-plan` or `/cys:flow`. **Claude Code only.** |
+| `cys:check` | adversarial review / verification |
+| `cys:ship` | commit / SemVer bump / PR |
+| `cys:guide` | index — which skill to use when |
+
+`/cys:flow` (Claude Code only) is the all-in-one entry point: give it a target
+repo and an idea, and it walks the whole flow (design → plan → parallel run) with
+your approval gates at each stage. Use `/cys:run-plan` instead when an approved
+plan already exists.
+
 Design spec: `docs/cys/specs/2026-07-04-parallel-plan-executor-design.md`.
 
-Ecosystem flow (all 5 skills, their artifacts, and the human approval
-gates): `docs/diagram/flujo-cys-ecosystem.mmd`.
+```mermaid
+flowchart TD
+    subgraph DESIGN["1 · cys:design"]
+        D1["User's idea"]
+        D2["Dialogue: context,\none question at a time,\n2-3 approaches"]
+        D3["docs/cys/specs/*.md"]
+        D1 --> D2 --> D3
+    end
+
+    GATE1{"Human gate:\ndoes the user\napprove the spec?"}
+    D3 --> GATE1
+    GATE1 -- "no, revise" --> D2
+    GATE1 -- "yes" --> PLAN
+
+    subgraph PLAN["2 · cys:plan"]
+        P1["Numbered tasks\nFiles + Consumes/Produces"]
+        P2["docs/cys/plans/*.md"]
+        P3["bin/parse-plan.js\ngraph dry-run"]
+        P1 --> P2 --> P3
+    end
+
+    PLAN --> RUN
+
+    subgraph RUN["3 · cys:run (Claude Code only)"]
+        R1["DAG inferred from the plan"]
+        R2["worktree + implement + adversarial\nreview + serialized merge,\nper task, in parallel where\nthe DAG allows it"]
+        R3["merged task-&lt;id&gt; branches\n+ .cys/ (briefs, reports, diffs)"]
+        R1 --> R2 --> R3
+    end
+
+    RUN --> CHECK
+
+    subgraph CHECK["4 · cys:check (optional)"]
+        C1["Extra review on a\nbranch that's ready"]
+        C2["Verdicts + findings\nto .cys/pending.md"]
+        C1 --> C2
+    end
+
+    CHECK --> SHIP
+    RUN -.-> SHIP
+
+    subgraph SHIP["5 · cys:ship"]
+        S1["Classifies the change,\ncomputes SemVer"]
+        S2["CHANGELOG + branch +\ncommit + PR"]
+        S1 --> S2
+    end
+
+    GATE2{"Human gate:\ndoes the user\nmerge the PR?"}
+    S2 --> GATE2
+    GATE2 -- "yes" --> DONE["Change integrated"]
+
+    style GATE1 fill:#8a6d1a,color:#fff
+    style GATE2 fill:#8a6d1a,color:#fff
+    style DONE fill:#1a6b2a,color:#fff
+```
+
+Source: `docs/diagram/flujo-cys-ecosystem.mmd`.
 
 ## See it in action (60 seconds)
 
@@ -38,46 +137,35 @@ Tasks 2 and 3 don't depend on each other — cys inferred that from their
 after another. Every task went through its own isolated git worktree, an
 adversarial code review, and a serialized merge — you get a PR with a
 whole-branch review verdict, not just green tests. See
-[Reporting bugs](#reporting-bugs) below if anything looks off — the
+[Reporting bugs](#reporting-bugs--contributing) below if anything looks off — the
 final review already writes its own findings to `.cys/pending.md` for you.
 
-## What kind of thing is this? (plugin? skill? neither)
+## Quick Start
 
-Neither. This repo is a **`Workflow` script** — a third kind of Claude Code extension,
-different from plugins and skills:
+The fast path, for Claude Code — no cloning, no building. Installing the
+plugin already materializes this whole repo (pre-built engine included)
+where Claude Code can run it:
 
-- It is **not a plugin**: you don't install it through `/plugin` or a marketplace.
-- It is **not a skill**: it doesn't live under `.claude/skills/` and isn't invoked
-  through the Skill tool.
-- It is a **script for Claude Code's `Workflow` tool**: you clone this repo anywhere on
-  your machine, and Claude Code runs the script by absolute path
-  (`scriptPath: <clone>/workflows/parallel-plan-executor.js`) when you ask it to.
+```
+/plugin marketplace add bacsystem/parallel-plan-executor
+/plugin install cys@bacsystem
+```
 
-The only piece of it that gets "installed" in the Claude Code sense is the optional
-`/run-plan` slash command (a single `.md` file you copy — see below), or the **cys
-plugin** described next.
+Then, from any Claude Code session:
 
-## The cys plugin
+> `/cys:flow /absolute/path/to/your-project "describe what you want built"`
 
-**cys** is this repo's skill plugin: five skills covering the whole flow
-**design → plan → run → check → ship**, created by Christian Bacilio and named
-after his twin daughters, **Cielo y Sophia**.
+That's the whole flow — design, plan, and (Claude Code only) a real
+parallel run — with your approval at each gate. See
+[Installing the cys plugin](#installing-the-cys-plugin) for Cursor and
+Gemini CLI, and [Using cys](#using-cys) for the full first-run walkthrough
+once you're past the quick version.
 
-| Skill | What it does |
-|---|---|
-| `cys:design` | idea → spec |
-| `cys:plan` | spec → implementation plan |
-| `cys:run` | the Workflow in this repo — launched via `/cys:run-plan` or `commands/run-plan.md`. **Claude Code only** (see "Multi-AI support" below). |
-| `cys:check` | adversarial review / verification |
-| `cys:ship` | commit / SemVer bump / PR |
-| `cys:guide` | index — which skill to use when |
+On other platforms (Cursor, Gemini CLI), the plugin gives you `cys:design`
+and `cys:plan`; `cys:guide` tells you how to execute the resulting plan's
+tasks yourself, since `cys:run`'s parallel engine is Claude Code only.
 
-The plugin also ships `/cys:flow` (Claude Code only) — the all-in-one
-entry point: give it a target repo and an idea, and it walks the whole
-flow (design → plan → parallel run) with your approval gates at each
-stage. Use `/cys:run-plan` instead when an approved plan already exists.
-
-## Multi-AI support
+## Installing the cys plugin
 
 cys's five non-engine skills (`design`, `plan`, `check`, `ship`, `guide`)
 are plain Markdown with no Claude-Code-specific coupling, so they're
@@ -119,7 +207,7 @@ own Settings UI (confirmed working — Cursor's plugin UI changed after
 this section was first written, so trust these steps over any older
 screenshot you find elsewhere):
 
-1. Clone this repo (see [Installation](#installation) below — for just
+1. Clone this repo (see [Building from source](#building-from-source) below — for just
    the skills, cloning is enough, you don't need to build the workflow
    artifact or run its test suite).
 2. In Cursor: **Settings → Plugins** (or the **Customize** panel, if
@@ -182,72 +270,28 @@ skills available in every project — not just the one you ran the
 command from. Since install copies rather than tracks the repo live, run
 `gemini extensions update cys` to pick up future releases.
 
-`cys:run`'s parallel execution stays Claude-Code-only (see Requirements
-below): on Gemini CLI, `cys:guide` tells you how to execute a plan's
-tasks yourself instead.
-
-## Requirements
-
-- **[Claude Code](https://claude.com/claude-code)**, with access to the `Workflow` tool.
-  This is **not optional or swappable for another AI assistant**: the script in
-  `workflows/parallel-plan-executor.js` is written against that tool's primitives
-  (`agent()`, `pipeline()`, `parallel()`, etc.) — it isn't an open standard another
-  assistant (ChatGPT, Gemini, etc.) can interpret. What *is* agnostic is the **target
-  project** being automated: it can be Go, Node, Java, or whatever stack the plan
-  describes.
-- **The cys plugin** (see above) for authoring plans with `cys:plan`. The engine is
-  fully self-contained: the workflow ships its own `task-brief`/`review-package`
-  scripts in `bin/` and records runs under `.cys/`. Any plan following the
-  `### Task N:` + `Consumes`/`Produces` format works, whatever tool wrote it.
-- **Node.js >= 20** (for `bin/parse-plan.js` and the test suite — no runtime
-  dependencies, just standard Node).
-- Git, and a clean working tree in the project you're automating.
-- `gh` (GitHub CLI) installed and authenticated, **only if** you'll use `openPr: true`
-  (so the workflow can create the final PR).
-
-## Installation
-
-```bash
-# 1. Clone this repo (where the workflow lives) onto your machine.
-#    WHERE: anywhere you like — your home folder, a tools directory, etc.
-#    It does NOT need to be inside .claude/, and it does NOT need to live next to
-#    the projects you'll automate; every path you pass it later is absolute.
-git clone <this-repo-url> parallel-plan-executor
-cd parallel-plan-executor
-
-# 2. Check your Node version (must be >= 20)
-node --version
-
-# 3. Install (no runtime dependencies; this just wires up the npm scripts)
-npm install
-
-# 4. Run the test suite to confirm everything works in your environment
-npm test
-
-# 5. Build the workflow artifact (regenerates workflows/parallel-plan-executor.js
-#    from the template — also re-run this after any change under src/)
-npm run build
-```
-
-That's it — the workflow is invoked **from a Claude Code session**, no need to publish
-it to npm or install it globally. See Usage below. Before your first real run, also do
-the one-time **permissions setup** below so task merges don't get blocked mid-run.
+`cys:run`'s parallel execution stays Claude-Code-only (see
+[Building from source](#building-from-source) below): on Gemini CLI,
+`cys:guide` tells you how to execute a plan's tasks yourself instead.
 
 ## One-time permissions setup (merges)
 
-The workflow's merge agents run `git merge` inside your target repo. Claude Code treats
-an agent merging code as a sensitive action, and what happens depends on your
-permission mode:
+Do this once, before your first real `cys:run`, so task merges don't get
+blocked mid-run.
+
+The workflow's merge agents run `git merge` inside your target repo. Claude
+Code treats an agent merging code as a sensitive action, and what happens
+depends on your permission mode:
 
 - **Default (normal) mode**: nothing to configure. The first time a merge agent runs
   `git merge`, you get Claude Code's native permission dialog — **Allow once / Allow
   always / Deny**. Pick "Allow always" on the first one and the rest of the run flows
   without asking again.
-- **Auto mode**: there is no dialog by default — an automatic classifier decides alone,
-  and it may block agent merges even when you authorized the run up front (see the
-  permissions note further down for why). To get the same yes/no dialog as normal mode,
-  add an **`ask` rule** to the **target project's** `.claude/settings.json` (create the
-  file if needed):
+- **Auto mode**: there is no dialog by default — an automatic classifier decides
+  alone, and it may block agent merges even when you authorized the run up front (see
+  the permissions note in [branching topology](#recommended-branching-topology) for
+  why). To get the same yes/no dialog as normal mode, add an **`ask` rule** to the
+  **target project's** `.claude/settings.json` (create the file if needed):
 
 ```json
 {
@@ -265,27 +309,20 @@ deterministically, regardless of mode — you just click, never type. If you'd r
 never be asked, use `"allow"` instead of `"ask"` (the run becomes fully hands-off; the
 human gate moves to the final PR review).
 
-## How it works
+## Using cys
 
-1. `bin/parse-plan.js` reads a plan file and computes its task list + dependency graph
-   (pure Node, fully unit tested — see `tests/`).
-2. `workflows/parallel-plan-executor.js` (built from `workflows-src/parallel-plan-executor.template.js`
-   via `npm run build`) takes that graph and runs each task in its own git worktree via
-   `agent()`, starting a task the moment its specific dependencies finish rather than
-   waiting for a whole batch.
-3. Each task gets an adversarial review agent instead of a human checkpoint per task,
-   since a `Workflow` can't pause mid-run to ask you anything.
-4. Merges happen one at a time, serialized, respecting the dependency order.
-5. You get a single report at the end, and — if at least one task merged — a **Handoff**
-   agent prepares the git-flow closing for you (see below).
+This section walks the full first-run experience, then covers the
+reference pieces (manual invocation, the `/run-plan` command, the
+Handoff phase, branch topology) for when you need more control than
+`/cys:flow` gives you.
 
-## Step-by-step guide (first time using this)
+### Step-by-step guide (first time using this)
 
-This section is for anyone who hasn't run the workflow before and wants to go through
-it without getting lost. If you already know it, the "Usage" section below is the quick
-reference.
+This subsection is for anyone who hasn't run the workflow before and wants to go
+through it without getting lost. If you already know it, [Manual
+invocation](#manual-invocation-reference) below is the quick reference.
 
-### Step 0 — What you need ready before starting
+#### Step 0 — What you need ready before starting
 
 - **An approved implementation plan**, with numbered tasks and their
   `Consumes`/`Produces` blocks (the format produced by the `cys:plan` skill). If you
@@ -295,17 +332,17 @@ reference.
 - **The repo you're automating**, with a clean working tree (`git status` shows no
   pending changes) and, if you'll request `openPr: true` at the end, a GitHub remote
   already configured with `gh auth status` green.
-- This repo (`parallel-plan-executor`) cloned and installed — see Installation above.
-  It doesn't need to live in the same folder as your project: the paths you pass it are
-  always absolute.
+- The cys plugin installed (see [Quick Start](#quick-start)) — no manual cloning
+  needed for this path. If you're driving the engine directly instead of through the
+  plugin commands, see [Building from source](#building-from-source).
 
-### Step 1 — Open a Claude Code session
+#### Step 1 — Open a Claude Code session
 
 It can be in your project's folder, in this repo's folder, or anywhere else — the
 workflow doesn't depend on where your Claude Code session is running, as long as you
 give it absolute paths to the plan and the target repo.
 
-### Step 2 — Ask Claude Code in plain language
+#### Step 2 — Ask Claude Code in plain language
 
 **You don't need to hand-write the `args` JSON.** That's Claude Code's job: you just
 tell it what you want in a sentence, with these pieces of information:
@@ -334,10 +371,10 @@ and invoking the `Workflow` tool with this repo's script — you never touch JSO
 > permission classifier in auto mode, it may require a human to explicitly authorize
 > merges — and that authorization needs to name the concrete action ("merge task-1
 > through task-6"), not a plain "yes" or "go ahead". Saying it upfront, with branches
-> named, avoids the run getting stuck partway through. See the permissions note below
-> for the technical detail.
+> named, avoids the run getting stuck partway through. See the permissions note in
+> [branching topology](#recommended-branching-topology) for the technical detail.
 
-### Step 3 — What you'll see while it runs
+#### Step 3 — What you'll see while it runs
 
 The workflow runs in the background — it doesn't wait for your reply. You'll see:
 
@@ -352,7 +389,7 @@ anything went wrong. You can also open Claude Code's `/workflows` panel to see t
 per-phase detail (Implement, Review, Merge, Final review, Handoff), how many agents and
 tokens each phase used, and each agent's timing.
 
-### Step 4 — If something gets stuck
+#### Step 4 — If something gets stuck
 
 The most common snag is a merge getting marked as blocked out of caution, **even after
 you authorized upfront** — that's an environment safety measure, not a flaw in your
@@ -364,18 +401,19 @@ plan. If that happens:
 3. The run is recoverable: nothing already done is lost. Tasks that already finished
    (implemented, reviewed, merged) don't re-run — only what's still pending retries.
 
-### Step 5 — When it finishes
+#### Step 5 — When it finishes
 
 - If **at least one task merged**, you'll have a `.cys/handoff.md` file in
   your project with: the suggested PR title and body, the proposed SemVer bump, and a
-  cleanup checklist (which `task-N` branches to delete and when).
+  cleanup checklist (which `task-N` branches to delete and when) — see
+  [Handoff phase](#handoff-phase) for the full detail.
 - If you requested `openPr: true`, the PR is **already created** in GitHub against the
   branch you specified — review it yourself and merge it whenever you're satisfied. The
   workflow never merges the PR on its own; that decision always stays in your hands.
 - If any task failed or got blocked, the final report will tell you exactly which one
   and why — and which other tasks were skipped in cascade because they depended on it.
 
-### Common errors
+#### Common errors
 
 | What you see | What it means |
 |---|---|
@@ -384,7 +422,10 @@ plan. If that happens:
 | The run stops partway through | It's recoverable: Claude Code can resume it without losing the work already done. |
 | The agent takes several minutes "doing nothing" when the first task starts | Normal — the first `implement` includes setting up the project's environment; you'll see the progress notice as soon as it's done. |
 
-## Usage
+### Manual invocation (reference)
+
+Once you know the flow, this is the raw shape of what `/cys:flow`/`/cys:run-plan`
+do for you — useful if you're scripting around cys or want to see every field:
 
 ```bash
 # 1. Compute the task graph for your plan
@@ -407,7 +448,7 @@ node bin/parse-plan.js /path/to/your-plan.md > /tmp/plan-graph.json
 #            mergeAuthorization: "I authorize merging task-1 through task-N into <branch>",
 #               # optional but recommended: your explicit authorization, so the merge
 #               # agent doesn't have to guess whether consent was already given (see the
-#               # permissions note below)
+#               # permissions note in branching topology below)
 #            maxConcurrency: 3                      # optional, default unlimited — see below
 #            }
 ```
@@ -418,13 +459,13 @@ Claude Code `Workflow` tool already queues excess `agent()` calls beyond its own
 many simultaneous local git worktrees on your own machine for a plan with a wide layer of
 independent tasks.
 
-## Optional: the `/run-plan` slash command
+### The `/run-plan` slash command
 
 If you'd rather not type out the natural-language request from the step-by-step guide
 every time, this repo ships a Claude Code custom slash command that wraps it:
 `commands/run-plan.md`.
 
-### Installing it
+#### Installing it
 
 1. Copy `commands/run-plan.md` from this repo to either:
    - `~/.claude/commands/run-plan.md` — available in **every** project on your machine, or
@@ -441,18 +482,19 @@ every time, this repo ships a Claude Code custom slash command that wraps it:
 3. That's it — no restart needed. Claude Code picks up commands under `.claude/commands/`
    the next time you use them.
 
-### Using it
+#### Using it
 
 ```
 /run-plan /path/to/your-plan.md /path/to/your/project feature/my-plan
 ```
 
 All three arguments are optional to type up front — the command will ask you for
-anything you leave out, plus whatever `Usage` above lists as optional (`openPr`, `pr`
-fields, your merge authorization). It never invents your authorization text on your
-behalf; it always asks you to name the branches yourself.
+anything you leave out, plus whatever [manual invocation](#manual-invocation-reference)
+above lists as optional (`openPr`, `pr` fields, your merge authorization). It never
+invents your authorization text on your behalf; it always asks you to name the branches
+yourself.
 
-## Handoff phase (v0.5.0)
+### Handoff phase
 
 When at least one task merged, a final **handoff agent** prepares the git-flow closing
 for you — without executing it. It writes `.cys/handoff.md` in the target
@@ -466,7 +508,7 @@ integration branch and **creates** the pull request via `gh` against `pr.base` (
 `develop`), applying the optional `pr` fields — assignees, labels, milestone, and
 `Closes #<closes>` in the body. **It never merges the PR**: that gate is human, always.
 
-## Recommended branching topology (validated in pilot 4)
+### Recommended branching topology
 
 Point `integrationBranch` at an **ephemeral feature branch cut from `develop`** — never
 at `develop`/`main` directly:
@@ -491,12 +533,85 @@ mode, an automatic classifier judges each agent action on its own, and agent-per
 (finding F8 in `docs/pilots/2026-07-15-pilot-stats-bitacora.md`) — but it does **not**
 bind the classifier: in a later real run the classifier explicitly rejected that relayed
 text as "self-asserted, unverifiable" consent and blocked the merge anyway. The
-deterministic fix is the **one-time permissions setup** near the top of this README: an
-`ask` (or `allow`) rule for `git merge` in the target project's `.claude/settings.json`,
-added by you. Rules take precedence over the mode — with the rule in place you get a
-plain yes/no dialog (or silent allow) instead of a classifier judgment call.
+deterministic fix is the [one-time permissions setup](#one-time-permissions-setup-merges)
+above: an `ask` (or `allow`) rule for `git merge` in the target project's
+`.claude/settings.json`, added by you. Rules take precedence over the mode — with the
+rule in place you get a plain yes/no dialog (or silent allow) instead of a classifier
+judgment call.
 
-## Safety checks (v0.2)
+## Building from source
+
+Only needed if you're **contributing to this repo**, or want to run the raw
+`Workflow` script without going through the plugin commands. If you just want
+to *use* cys, [Quick Start](#quick-start) is enough — installing the plugin
+already gives you a ready-to-run, pre-built copy.
+
+### Requirements
+
+- **[Claude Code](https://claude.com/claude-code)**, with access to the `Workflow` tool.
+  This is **not optional or swappable for another AI assistant**: the script in
+  `workflows/parallel-plan-executor.js` is written against that tool's primitives
+  (`agent()`, `pipeline()`, `parallel()`, etc.) — it isn't an open standard another
+  assistant (ChatGPT, Gemini, etc.) can interpret. What *is* agnostic is the **target
+  project** being automated: it can be Go, Node, Java, or whatever stack the plan
+  describes.
+- **The cys plugin** (see [Installing the cys plugin](#installing-the-cys-plugin)) for
+  authoring plans with `cys:plan`. The engine is fully self-contained: the workflow ships
+  its own `task-brief`/`review-package` scripts in `bin/` and records runs under `.cys/`.
+  Any plan following the `### Task N:` + `Consumes`/`Produces` format works, whatever
+  tool wrote it.
+- **Node.js >= 20** (for `bin/parse-plan.js` and the test suite — no runtime
+  dependencies, just standard Node).
+- Git, and a clean working tree in the project you're automating.
+- `gh` (GitHub CLI) installed and authenticated, **only if** you'll use `openPr: true`
+  (so the workflow can create the final PR).
+
+### Cloning and building
+
+```bash
+# 1. Clone this repo (where the workflow lives) onto your machine.
+#    WHERE: anywhere you like — your home folder, a tools directory, etc.
+#    It does NOT need to be inside .claude/, and it does NOT need to live next to
+#    the projects you'll automate; every path you pass it later is absolute.
+git clone <this-repo-url> parallel-plan-executor
+cd parallel-plan-executor
+
+# 2. Check your Node version (must be >= 20)
+node --version
+
+# 3. Install (no runtime dependencies; this just wires up the npm scripts)
+npm install
+
+# 4. Run the test suite to confirm everything works in your environment
+npm test
+
+# 5. Build the workflow artifact (regenerates workflows/parallel-plan-executor.js
+#    from the template — also re-run this after any change under src/)
+npm run build
+```
+
+That's it — the workflow is invoked **from a Claude Code session**, no need to publish
+it to npm or install it globally. See [Using cys](#using-cys) above. Before your first
+real run, also do the [one-time permissions setup](#one-time-permissions-setup-merges)
+so task merges don't get blocked mid-run.
+
+## How it works
+
+1. `bin/parse-plan.js` reads a plan file and computes its task list + dependency graph
+   (pure Node, fully unit tested — see `tests/`).
+2. `workflows/parallel-plan-executor.js` (built from `workflows-src/parallel-plan-executor.template.js`
+   via `npm run build`) takes that graph and runs each task in its own git worktree via
+   `agent()`, starting a task the moment its specific dependencies finish rather than
+   waiting for a whole batch.
+3. Each task gets an adversarial review agent instead of a human checkpoint per task,
+   since a `Workflow` can't pause mid-run to ask you anything.
+4. Merges happen one at a time, serialized, respecting the dependency order.
+5. You get a single report at the end, and — if at least one task merged — a **Handoff**
+   agent prepares the git-flow closing for you (see [Handoff phase](#handoff-phase)).
+
+## Safety checks & known limitations
+
+### Safety checks (v0.2)
 
 - **Startup validation**: the workflow validates `args` before launching any agent —
   a cyclic graph or an id present in `graph` but missing from `tasks` fails fast with a
@@ -509,7 +624,7 @@ plain yes/no dialog (or silent allow) instead of a classifier judgment call.
 - **Skip reasons point at the root cause**: a task skipped through a cascade reports the
   task that originally failed, not the intermediate skipped link.
 
-## Known limitations (v1)
+### Known limitations (v1)
 
 - Only backtick-quoted symbols count in `Consumes`/`Produces` (e.g.
   `` - Produces: the `createWidget()` factory `` produces `createWidget`). Bare prose is
@@ -529,7 +644,7 @@ plain yes/no dialog (or silent allow) instead of a classifier judgment call.
   preserve whatever partial state exists for diagnosis. Clean them up afterwards with
   `git branch -D task-<id>` once you no longer need them.
 
-## Reporting bugs
+## Reporting bugs & contributing
 
 Open an issue at
 [github.com/bacsystem/parallel-plan-executor/issues](https://github.com/bacsystem/parallel-plan-executor/issues)
@@ -542,3 +657,7 @@ write a fresh repro from scratch:
 - `.cys/task-<id>-report.md`, for the specific task that misbehaved.
 - `review-*.diff`, if a review flagged something.
 - The exact stderr/stdout of a failing command (e.g. `node bin/parse-plan.js`).
+
+Want to contribute code or docs? See `CONTRIBUTING.md` for this repo's
+evidence-driven discipline (every behavior change needs a test tracing to a real
+finding, plus a comment explaining why) and the TDD/build workflow.

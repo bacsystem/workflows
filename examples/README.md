@@ -26,4 +26,4 @@ read yourself right now.
 4. To actually run this plan in parallel (not just read its graph), point
    `cys:run` / `/cys:run-plan` at `examples/hello-parallel/plan.md`
    against a throwaway git repo of your own — see the main
-   [README](../README.md#usage) for the full launch steps.
+   [README](../README.md#using-cys) for the full launch steps.

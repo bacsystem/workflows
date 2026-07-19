@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.19 — 2026-07-19
+
+Changed:
+
+- Reorganized both `README.md` and `README.es.md` around a clear path
+  for a new user: What is cys → demo → Quick Start → plugin install (per
+  platform) → permissions setup → Using cys (step-by-step guide, manual
+  reference, `/run-plan`, Handoff, branch topology) → Building from
+  source → How it works → safety checks & known limitations → reporting
+  bugs & contributing. Added a table of contents to both. Surfaces a
+  distinction the old ordering buried: installing the cys plugin via the
+  marketplace already gives a ready-to-run, pre-built copy of this repo
+  — cloning and `npm run build` are only needed for contributors or
+  advanced engine use, not a typical first run.
+- Embedded `docs/diagram/flujo-cys-ecosystem.mmd`'s content directly as
+  a rendered Mermaid diagram in both READMEs instead of only linking the
+  file.
+
+Fixed:
+
+- `examples/README.md`'s `#usage` anchor link, stale after the
+  reorganization renamed that section to `#using-cys`.
+
 ## 0.6.18 — 2026-07-19
 
 Added:
