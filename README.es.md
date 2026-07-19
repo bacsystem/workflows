@@ -12,6 +12,33 @@ Node y en Java/Spring Boot, y no hay nada en el diseño atado a un lenguaje en p
 
 Spec de diseño: `docs/cys/specs/2026-07-04-parallel-plan-executor-design.md`.
 
+## Viéndolo en acción (60 segundos)
+
+Un solo pedido, en lenguaje natural:
+
+> `/cys:flow ~/proyectos/persons-api "Una API REST CRUD para gestionar personas, Java 17 / Spring Boot 3, persistencia en MongoDB"`
+
+cys convierte eso en un spec, un plan, y — la parte que realmente lo
+distingue de otras herramientas de IA para programar — una ejecución
+**paralela** de verdad. De una corrida piloto con exactamente esa idea:
+
+| Tarea | Qué construyó | Corrió |
+|---|---|---|
+| 1. Modelo de dominio y scaffolding | Documento `Person`, proyecto Maven | sola — todo lo demás depende de ella (9m13s) |
+| 2. Repositorio | `PersonRepository` | **en paralelo** con la Tarea 3 (2m01s) |
+| 3. Capa de servicio | reglas de negocio, validación | **en paralelo** con la Tarea 2 (1m46s) |
+| 4. Controlador | endpoints REST | después de 1–3 (2m11s) |
+| 5. Manejo de errores | `GlobalExceptionHandler` | después de 1 y 4 (2m56s) |
+
+Las Tareas 2 y 3 no dependen entre sí — cys lo infirió de sus bloques
+`Consumes`/`Produces` y las corrió al mismo tiempo en vez de una
+detrás de la otra. Cada tarea pasó por su propio worktree de git
+aislado, una revisión adversarial de código, y un merge serializado —
+te queda un PR con un veredicto de revisión de toda la rama, no solo
+tests en verde. Mirá [Reportar un bug](#reportar-un-bug) más abajo si
+algo se ve raro — la revisión final ya escribe sus propios hallazgos en
+`.cys/pending.md` por vos.
+
 ## ¿Qué tipo de cosa es esto? (¿plugin? ¿skill? ninguno)
 
 Ninguno de los dos. Este repo es un **script de `Workflow`** — un tercer tipo de
