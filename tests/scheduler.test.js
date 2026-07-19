@@ -85,3 +85,57 @@ test('el motivo del skip distingue failed de skipped y apunta a la causa raíz',
   assert.match(results.get(3).reason, /skipped dependency \(task 2\)/);
   assert.match(results.get(3).reason, /root cause: task 1 failed/);
 });
+
+test('caps concurrency at maxConcurrency', async () => {
+  const graph = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+  let running = 0;
+  let peak = 0;
+
+  await runDag(graph, async (id) => {
+    running++;
+    peak = Math.max(peak, running);
+    await delay(10);
+    running--;
+    return id;
+  }, { maxConcurrency: 2 });
+
+  assert.equal(peak, 2);
+});
+
+test('maxConcurrency: 1 over a chain preserves topological order', async () => {
+  const graph = { 1: [], 2: [1], 3: [2] };
+  const order = [];
+
+  await runDag(graph, async (id) => {
+    order.push(id);
+    await delay(5);
+  }, { maxConcurrency: 1 });
+
+  assert.deepEqual(order, [1, 2, 3]);
+});
+
+test('no options means unlimited concurrency, same as before this change', async () => {
+  const graph = { 1: [], 2: [], 3: [] };
+  let running = 0;
+  let peak = 0;
+
+  await runDag(graph, async () => {
+    running++;
+    peak = Math.max(peak, running);
+    await delay(10);
+    running--;
+  });
+
+  assert.equal(peak, 3);
+});
+
+test('a diamond completes without deadlock under maxConcurrency: 2', async () => {
+  const graph = { 1: [], 2: [], 3: [1, 2] };
+
+  const results = await runDag(graph, async (id) => {
+    await delay(5);
+    return id;
+  }, { maxConcurrency: 2 });
+
+  assert.equal(results.get(3).status, 'done');
+});

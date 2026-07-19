@@ -4,7 +4,7 @@ import { assertAcyclic, assertUniqueTaskIds } from './graph-builder.js';
 // un ciclo en ese grafo deja a runDag esperando su propia promesa memoizada para
 // siempre — deadlock sin error ni log. Esta validación corre antes de lanzar cualquier
 // agente para que el fallo sea inmediato y explicable.
-export function validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly }) {
+export function validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly, maxConcurrency }) {
   if (finishOnly !== undefined && typeof finishOnly !== 'boolean') {
     throw new Error('args.finishOnly must be a boolean when present');
   }
@@ -43,6 +43,16 @@ export function validateWorkflowArgs({ tasks, graph, integrationBranch, executor
     // política de "merges requieren autorización humana" de memoria, inconsistentemente
     // entre tareas. Debe ser las palabras textuales del usuario, no un booleano.
     throw new Error('args.mergeAuthorization must be a string (the user\'s own authorization words) when present');
+  }
+  if (
+    maxConcurrency !== undefined &&
+    maxConcurrency !== Infinity &&
+    (!Number.isInteger(maxConcurrency) || maxConcurrency < 1)
+  ) {
+    // Un tope inválido (0, negativo, no entero, no numérico) dejaría el semáforo de
+    // runDag en un estado que nunca libera slots o que nunca los otorga — mejor fallar
+    // rápido acá que deadlockear después de haber lanzado agentes.
+    throw new Error('args.maxConcurrency must be Infinity or a positive integer when present');
   }
 
   assertUniqueTaskIds(tasks);

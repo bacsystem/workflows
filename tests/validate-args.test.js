@@ -28,6 +28,23 @@ test('rechaza finishOnly no-booleano', () => {
   );
 });
 
+test('acepta maxConcurrency ausente, Infinity, o un entero positivo', () => {
+  const tasks = [{ id: 1, title: 'A' }];
+  const graph = { 1: [] };
+  assert.doesNotThrow(() => validateWorkflowArgs({ tasks, graph, ...BRANCH }));
+  assert.doesNotThrow(() => validateWorkflowArgs({ tasks, graph, ...BRANCH, maxConcurrency: Infinity }));
+  assert.doesNotThrow(() => validateWorkflowArgs({ tasks, graph, ...BRANCH, maxConcurrency: 3 }));
+});
+
+test('rechaza maxConcurrency inválido', () => {
+  const tasks = [{ id: 1, title: 'A' }];
+  const graph = { 1: [] };
+  assert.throws(() => validateWorkflowArgs({ tasks, graph, ...BRANCH, maxConcurrency: 0 }), /maxConcurrency/);
+  assert.throws(() => validateWorkflowArgs({ tasks, graph, ...BRANCH, maxConcurrency: -1 }), /maxConcurrency/);
+  assert.throws(() => validateWorkflowArgs({ tasks, graph, ...BRANCH, maxConcurrency: 2.5 }), /maxConcurrency/);
+  assert.throws(() => validateWorkflowArgs({ tasks, graph, ...BRANCH, maxConcurrency: 'a lot' }), /maxConcurrency/);
+});
+
 test('rechaza un graph ausente', () => {
   assert.throws(() => validateWorkflowArgs({ tasks: [{ id: 1, title: 'A' }], graph: null, ...BRANCH }), /must be an object/);
 });
