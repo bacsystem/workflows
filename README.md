@@ -161,6 +161,28 @@ Then reload Cursor (Command Palette → "Developer: Reload Window") to
 pick it up.
 </details>
 
+### Gemini CLI
+
+The five non-engine skills (`design`, `plan`, `check`, `ship`, `guide`)
+also work in [Gemini CLI](https://geminicli.com), via its native Agent
+Skills feature — no forked copy, `skills/` is discovered as-is by
+directory-name convention (no manifest field needed, unlike Cursor).
+
+Install:
+
+```
+gemini extensions install https://github.com/bacsystem/parallel-plan-executor
+```
+
+This clones the whole repo to `~/.gemini/extensions/cys/` and makes the
+skills available in every project — not just the one you ran the
+command from. Since install copies rather than tracks the repo live, run
+`gemini extensions update cys` to pick up future releases.
+
+`cys:run`'s parallel execution stays Claude-Code-only (see Requirements
+below): on Gemini CLI, `cys:guide` tells you how to execute a plan's
+tasks yourself instead.
+
 ## Requirements
 
 - **[Claude Code](https://claude.com/claude-code)**, with access to the `Workflow` tool.
