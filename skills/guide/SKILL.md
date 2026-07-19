@@ -18,6 +18,10 @@ Five stages, five skills — each stage's output is the next stage's input.
 | 4. Check | `cys:check` | change → verdicts (spec PASS/FAIL + quality APPROVED/NEEDS_FIXES) |
 | 5. Ship | `cys:ship` | working tree → Conventional Commit, SemVer bump, PR |
 
+See `docs/diagram/flujo-cys-ecosystem.mmd` for this same flow as a
+diagram, with each stage's input/output artifact and the two human gates
+(spec approval, PR merge).
+
 Stage 3 is what makes cys different: independent plan tasks execute in
 PARALLEL via a dependency DAG inferred from each task's Consumes/Produces
 block — not one at a time. Stage 4 runs automatically inside stage 3 for
@@ -90,3 +94,13 @@ review finding is left unresolved — see `cys:check`.
   serializes what must be serial (shared files, Consumes/Produces
   dependencies) and parallelizes the rest.
 - No agent-performed PR merges, ever.
+
+## When cys is overhead
+
+The full flow — worktrees, adversarial review, serialized merge — earns
+its keep when a change has several tasks, non-trivial dependencies, or
+where inferred parallelism actually saves wall-clock time. It's real
+overhead for a one-line fix, a trivial exploration, or anything you'd
+finish faster just doing it by hand. Use your judgment; cys respecting
+your time includes not routing small changes through the whole flow
+just because the tool exists.

@@ -12,6 +12,9 @@ Java/Spring Boot projects, nothing in the design is tied to a specific language.
 
 Design spec: `docs/cys/specs/2026-07-04-parallel-plan-executor-design.md`.
 
+Ecosystem flow (all 5 skills, their artifacts, and the human approval
+gates): `docs/diagram/flujo-cys-ecosystem.mmd`.
+
 ## See it in action (60 seconds)
 
 One request, in plain language:
@@ -401,11 +404,19 @@ node bin/parse-plan.js /path/to/your-plan.md > /tmp/plan-graph.json
 #            openPr: true,                          # optional: push + open the PR at the end
 #            pr: { base: "develop", assignees: ["me"], labels: ["story"],
 #                  milestone: "v1.2", closes: 42 },  # optional PR fields (git-flow contract)
-#            mergeAuthorization: "I authorize merging task-1 through task-N into <branch>"
-#            }  # optional but recommended: your explicit authorization, so the merge
+#            mergeAuthorization: "I authorize merging task-1 through task-N into <branch>",
+#               # optional but recommended: your explicit authorization, so the merge
 #               # agent doesn't have to guess whether consent was already given (see the
 #               # permissions note below)
+#            maxConcurrency: 3                      # optional, default unlimited — see below
+#            }
 ```
+
+`maxConcurrency` caps how many tasks `cys:run` executes at once within a DAG layer. The
+Claude Code `Workflow` tool already queues excess `agent()` calls beyond its own
+`min(16, cores-2)` cap, so this is mainly useful to go *lower* than that — e.g. to avoid
+many simultaneous local git worktrees on your own machine for a plan with a wide layer of
+independent tasks.
 
 ## Optional: the `/run-plan` slash command
 

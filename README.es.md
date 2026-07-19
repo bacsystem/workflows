@@ -12,6 +12,9 @@ Node y en Java/Spring Boot, y no hay nada en el diseño atado a un lenguaje en p
 
 Spec de diseño: `docs/cys/specs/2026-07-04-parallel-plan-executor-design.md`.
 
+Flujo del ecosistema (las 5 skills, sus artefactos, y los gates humanos
+de aprobación): `docs/diagram/flujo-cys-ecosystem.mmd`.
+
 ## Viéndolo en acción (60 segundos)
 
 Un solo pedido, en lenguaje natural:
@@ -434,11 +437,19 @@ node bin/parse-plan.js /ruta/a/tu-plan.md > /tmp/plan-graph.json
 #            openPr: true,                          # opcional: pushear y abrir el PR al final
 #            pr: { base: "develop", assignees: ["yo"], labels: ["story"],
 #                  milestone: "v1.2", closes: 42 },  # campos opcionales del PR (contrato git-flow)
-#            mergeAuthorization: "Autorizo mergear las ramas task-1 a task-N contra <rama>"
-#            }  # opcional pero recomendado: tu autorización explícita, para que el agente
+#            mergeAuthorization: "Autorizo mergear las ramas task-1 a task-N contra <rama>",
+#               # opcional pero recomendado: tu autorización explícita, para que el agente
 #               # de merge no tenga que adivinar si ya diste consentimiento (ver nota de
 #               # permisos más abajo)
+#            maxConcurrency: 3                      # opcional, default ilimitado — ver abajo
+#            }
 ```
+
+`maxConcurrency` acota cuántas tareas ejecuta `cys:run` a la vez dentro de una capa del
+DAG. La tool `Workflow` de Claude Code ya encola las llamadas a `agent()` que exceden su
+propio tope de `min(16, cores-2)`, así que esto sirve sobre todo para ir *más abajo* de
+ese default — por ejemplo, para evitar muchos worktrees locales simultáneos en tu propia
+máquina cuando un plan tiene una capa ancha de tareas independientes.
 
 ## Opcional: el comando `/run-plan`
 

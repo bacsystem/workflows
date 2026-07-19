@@ -5,6 +5,95 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.18 — 2026-07-19
+
+Added:
+
+- `cys:run`'s final summary now reports run stats: task outcome counts
+  (done/failed/skipped), the plan's inferred parallel width (via the new
+  `computeParallelWidth(graph)` in `src/graph-builder.js`), and — for
+  runs with at least one done task — sequential-equivalent work (sum of
+  each done task's own duration) alongside the wall-clock window (first
+  start to last finish). No fabricated "speedup" number: agent-reported
+  timestamps aren't a monotonic clock, so the summary shows both numbers
+  and lets them speak.
+
+Last of the four branches from the same external code-review prompt
+(dated 2026-07-19) — see `docs/cys/specs/2026-07-19-run-summary-design.md`.
+
+## 0.6.17 — 2026-07-19
+
+Added:
+
+- `CONTRIBUTING.md`: codifies the repo's evidence-driven discipline (a
+  behavior change needs a test tracing to a real finding plus a comment
+  explaining why), the TDD/one-commit-per-fix workflow, the
+  never-hand-edit-the-generated-file rule, and the open-PR check before
+  opening a new one.
+- `cys:guide` gained a "When cys is overhead" section: the full flow is
+  real overhead for a one-line fix or trivial exploration — worth saying
+  honestly, not just documenting when to use the tool.
+
+Both items originated from the same external code-review prompt (dated
+2026-07-19) as `feat/engine-limits` (v0.6.15) and `docs/onboarding`
+(v0.6.16) — see `docs/cys/specs/2026-07-19-contributing-design.md`.
+Versioned as 0.6.17 (one ahead of both already-open PRs) to avoid a
+version collision when all three merge to `develop`.
+
+## 0.6.16 — 2026-07-19
+
+Added:
+
+- `examples/hello-parallel/`: a minimal, real, parseable plan whose own
+  dependency graph shows genuine inferred parallelism — two independent
+  tasks with no edge between them, not a description of parallel
+  execution. Tested so it can't silently rot if the parser changes.
+- `docs/diagram/flujo-cys-ecosystem.mmd`: a Mermaid diagram of the whole
+  5-skill flow (`design → plan → run → check → ship`), each stage's
+  input/output artifact, and the two human approval gates. Linked from
+  both READMEs and `cys:guide`'s stage table.
+
+Both items originated from the same external code-review prompt (dated
+2026-07-19) as the `feat/engine-limits` branch (v0.6.15) — see
+`docs/cys/specs/2026-07-19-onboarding-design.md`. Versioned as 0.6.16
+(one ahead of the already-open `feat/engine-limits` PR) to avoid a
+version-number collision when both merge to `develop`.
+
+## 0.6.15 — 2026-07-19
+
+Added:
+
+- `maxConcurrency` (optional `args` field, default unlimited): caps how
+  many tasks `cys:run` executes at once within a DAG layer. The Claude
+  Code `Workflow` tool already queues `agent()` calls beyond its own
+  `min(16, cores-2)` cap, so this is mainly useful to go lower than that
+  default — e.g. to avoid many simultaneous local git worktrees for a
+  plan with a wide layer of independent tasks. Wired through
+  `src/scheduler.js` (`runDag`'s new third param, semaphore gated after
+  dependency resolution to avoid deadlock), `src/validate-args.js`, and
+  the workflow template; documented in both READMEs.
+- `src/graph-builder.js` now warns when a task's `Consumes` symbol has
+  no producing task anywhere in the plan — the same silent-dependency-
+  loss family as the empty-value parser bug fixed earlier this session,
+  just never covered before.
+
+Changed:
+
+- `assertAcyclic` is now iterative instead of recursive, as defense-in-
+  depth against a smaller stack on a different platform/container.
+  Behavior is unchanged (same cycle-detection message format, same
+  tests pass) — empirically, the recursive version didn't overflow the
+  stack even at 8 million chained tasks in this environment, so this
+  isn't fixing a reproduced failure, just hardening for one that hasn't
+  been observed.
+
+All three items originated from an external code-review prompt (dated
+2026-07-19) that read the full repo; each was independently re-verified
+against the actual current code before being accepted, and one item
+from that same prompt (a stack-overflow risk assumed for `assertAcyclic`
+at "hundreds of tasks") was found not to reproduce even at 8M — recorded
+in `docs/cys/specs/2026-07-19-engine-limits-design.md`.
+
 ## 0.6.14 — 2026-07-19
 
 Added:

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { parsePlan } from '../src/plan-parser.js';
-import { buildGraph, buildGraphWithDiagnostics, assertAcyclic } from '../src/graph-builder.js';
+import { buildGraph, buildGraphWithDiagnostics, assertAcyclic, computeParallelWidth } from '../src/graph-builder.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -37,6 +37,34 @@ test('serializa en cadena las tareas que tocan el mismo archivo', () => {
   assert.deepEqual(graph[1], []);
   assert.deepEqual(graph[2], [1]);
   assert.deepEqual(graph[3], [2], 'la tarea 3 debe depender del ÚLTIMO que tocó el archivo, no del primero');
+});
+
+test('advierte cuando una tarea consume un símbolo que nadie produce', () => {
+  const tasks = [{
+    id: 1, title: 'A',
+    files: { create: [], modify: [], test: [] },
+    interfaces: { consumes: ['noExiste'], produces: [] },
+  }];
+  const { warnings } = buildGraphWithDiagnostics(tasks);
+  assert.match(warnings.join('\n'), /task 1.*noExiste.*no task produces it/i);
+});
+
+test('no advierte cuando el símbolo consumido sí tiene productor', () => {
+  const tasks = [
+    { id: 1, title: 'A', files: { create: [], modify: [], test: [] }, interfaces: { consumes: [], produces: ['foo'] } },
+    { id: 2, title: 'B', files: { create: [], modify: [], test: [] }, interfaces: { consumes: ['foo'], produces: [] } },
+  ];
+  const { warnings } = buildGraphWithDiagnostics(tasks);
+  assert.equal(warnings.filter((w) => /produces it/i.test(w)).length, 0);
+});
+
+test('assertAcyclic maneja una cadena lineal larga sin fallar (guarda de regresión, no reproduce un desborde real hoy: ni 8M de tareas encadenadas revienta la pila recursiva en este entorno — igual se adopta la versión iterativa como defensa en profundidad para entornos con stack más chico)', () => {
+  const LENGTH = 50000;
+  const graph = {};
+  graph[0] = [];
+  for (let i = 1; i < LENGTH; i++) graph[i] = [i - 1];
+
+  assert.doesNotThrow(() => assertAcyclic(graph));
 });
 
 test('throws on a cyclic dependency', () => {
@@ -88,4 +116,20 @@ test('builds a real graph from a business-core plan excerpt', () => {
   const tasks = parsePlan(excerpt);
   const graph = buildGraph(tasks);
   assert.equal(Object.keys(graph).length, tasks.length);
+});
+
+test('computeParallelWidth: tres tareas independientes da ancho 3', () => {
+  assert.equal(computeParallelWidth({ 1: [], 2: [], 3: [] }), 3);
+});
+
+test('computeParallelWidth: una cadena lineal da ancho 1', () => {
+  assert.equal(computeParallelWidth({ 1: [], 2: [1], 3: [2] }), 1);
+});
+
+test('computeParallelWidth: un diamante (2 base + 1 dependiente) da ancho 2', () => {
+  assert.equal(computeParallelWidth({ 1: [], 2: [], 3: [1, 2] }), 2);
+});
+
+test('computeParallelWidth: grafo vacío da ancho 0', () => {
+  assert.equal(computeParallelWidth({}), 0);
 });

@@ -21,8 +21,8 @@ export const meta = {
 // invocado la tool (comprobado en el piloto 2026-07-15): destructurar el string daba
 // tasks undefined y un error que culpaba al campo equivocado.
 const resolvedArgs = typeof args === 'string' ? JSON.parse(args) : args;
-const { graph, tasks, planPath, repoPath, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly } = resolvedArgs;
-validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly }); // falla rápido y claro, nunca deadlock
+const { graph, tasks, planPath, repoPath, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly, maxConcurrency } = resolvedArgs;
+validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly, maxConcurrency }); // falla rápido y claro, nunca deadlock
 const tasksById = new Map(tasks.map((t) => [t.id, t]));
 
 // Fase 4b: snapshot completo del estado de cada tarea, para que una sesión futura (no
@@ -408,7 +408,7 @@ async function executeTask(taskId) {
 let results = new Map();
 if (!finishOnly) {
   await writeState();
-  results = await runDag(graph, runTask);
+  results = await runDag(graph, runTask, { maxConcurrency });
   // Las tareas skipped nunca pasan por runTask; reconciliar para que la barra cierre en N/N.
   settledCount = results.size;
   log(`${progressBar()} — ejecución terminada`);
@@ -447,6 +447,39 @@ const summaryLines = [...results.entries()].map(([id, r]) => {
   return `Task ${id}: skipped — ${r.reason}`;
 });
 log(summaryLines.join('\n'));
+
+const doneResults = [...results.values()].filter((r) => r.status === 'done');
+const outcomeCounts = {
+  done: doneResults.length,
+  failed: [...results.values()].filter((r) => r.status === 'failed').length,
+  skipped: [...results.values()].filter((r) => r.status === 'skipped').length,
+};
+const statsLines = [
+  `Tasks: ${results.size} total — ${outcomeCounts.done} done, ${outcomeCounts.failed} failed, ${outcomeCounts.skipped} skipped`,
+  `Plan's inferred parallel width: ${computeParallelWidth(graph)} (largest set of tasks with no dependency between them)`,
+];
+if (doneResults.length > 0) {
+  const durations = doneResults
+    .map((r) => hhmmssToSeconds(r.result?.finishedAt) - hhmmssToSeconds(r.result?.startedAt))
+    .map((secs) => (secs < 0 ? secs + 24 * 3600 : secs))
+    .filter((secs) => Number.isFinite(secs));
+  const sequentialEquivalentSecs = durations.reduce((sum, secs) => sum + secs, 0);
+  const starts = doneResults.map((r) => hhmmssToSeconds(r.result?.startedAt)).filter((s) => s !== null);
+  const ends = doneResults.map((r) => hhmmssToSeconds(r.result?.finishedAt)).filter((s) => s !== null);
+  if (starts.length > 0 && ends.length > 0) {
+    let wallClockSecs = Math.max(...ends) - Math.min(...starts);
+    if (wallClockSecs < 0) wallClockSecs += 24 * 3600;
+    // Sin Nx inventado: los tiempos vienen de `date` reportado por cada agente, no de un
+    // reloj monotónico — se muestran los dos números y que el usuario saque su conclusión.
+    statsLines.push(
+      `Sequential-equivalent work (sum of each done task's own duration): ` +
+      `${Math.floor(sequentialEquivalentSecs / 60)}m${String(sequentialEquivalentSecs % 60).padStart(2, '0')}s — ` +
+      `vs. wall-clock window (first start to last finish): ` +
+      `${Math.floor(wallClockSecs / 60)}m${String(wallClockSecs % 60).padStart(2, '0')}s`
+    );
+  }
+}
+log(statsLines.join('\n'));
 if (finalReview) log(`Final whole-branch review:\n${finalReview}`);
 
 // Un Error de JS serializa a {} al pasar por JSON: sin este mapeo, el objeto retornado

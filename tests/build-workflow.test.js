@@ -26,11 +26,19 @@ test('build script embeds the args validation and the template invokes it before
   assert.ok(output.includes('function assertAcyclic('));
   assert.ok(!output.includes('__VALIDATION_SOURCE__'));
   assert.ok(!output.includes('import '), 'the built file must be self-contained, no imports');
-  const validateIndex = output.indexOf('validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly })');
+  const validateIndex = output.indexOf('validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly, maxConcurrency })');
   assert.ok(validateIndex >= 0, 'the template must invoke validateWorkflowArgs with integrationBranch');
   assert.ok(
     validateIndex < output.indexOf('agent('),
     'validation must run before any agent() call'
+  );
+});
+
+test('el template pasa maxConcurrency a runDag', () => {
+  assert.match(
+    output,
+    /runDag\(graph, runTask, \{\s*maxConcurrency\s*\}\)/,
+    'runDag debe recibir el maxConcurrency del usuario, no ignorarlo'
   );
 });
 
@@ -43,7 +51,7 @@ test('built workflow tolerates args delivered as a JSON string (real harness beh
 
 test('built workflow names the integration branch explicitly instead of letting agents guess', () => {
   assert.ok(
-    output.includes('integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly } = resolvedArgs'),
+    output.includes('integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly, maxConcurrency } = resolvedArgs'),
     'integrationBranch y executorPath deben venir de los args resueltos (objeto o string parseado)'
   );
   assert.ok(
@@ -385,5 +393,20 @@ test('built workflow forces a real merge commit for task integrations, never a s
   assert.ok(
     output.includes('--no-ff'),
     'sin --no-ff, git hace fast-forward cuando puede, dejando un historial inconsistente entre tareas según el orden real de ejecución'
+  );
+});
+
+test('el resumen final incluye conteos de resultado, ancho de paralelismo y trabajo secuencial vs. ventana de pared', () => {
+  assert.ok(
+    output.includes('computeParallelWidth(graph)'),
+    'el resumen debe calcular el ancho de paralelismo inferido del plan'
+  );
+  assert.ok(
+    output.includes('Sequential-equivalent') || output.includes('secuencial'),
+    'el resumen debe mostrar el trabajo secuencial equivalente'
+  );
+  assert.ok(
+    !output.includes('speedup') && !output.includes('Nx faster') && !output.includes('veces más rápido'),
+    'el resumen no debe inventar un número de speedup — solo mostrar los datos'
   );
 });
