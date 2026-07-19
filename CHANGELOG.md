@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.13 — 2026-07-19
+
+Added:
+
+- CI workflow (`.github/workflows/ci.yml`): runs `npm test` and a
+  build-sync check (`npm run build` then `git diff --exit-code` against
+  the committed `workflows/parallel-plan-executor.js`) on every push/PR
+  to `develop`/`main`.
+- GitHub issue template for bug reports
+  (`.github/ISSUE_TEMPLATE/bug_report.md`), pointing reporters at
+  `.cys/pending.md`, `task-N-report.md`, and `review-*.diff` as the most
+  useful attachments.
+- "Reporting bugs" / "Reportar un bug" section in both READMEs, linking
+  to GitHub Issues.
+- "See it in action (60 seconds)" / "Viéndolo en acción (60 segundos)"
+  section near the top of both READMEs, using real pilot-run timing data.
+- Expanded GitHub repo topics.
+
+Changed:
+
+- Credited Christian Bacilio as cys's creator: `author` field in
+  `.claude-plugin/plugin.json` and `.cursor-plugin/plugin.json` (was
+  `"bacsystem"`, the org/marketplace identifier — left untouched
+  everywhere else), new `author` field in `package.json`, and both
+  READMEs now name him where the Cielo y Sophia origin story is told.
+
 ## 0.6.12 — 2026-07-18
 
 Fixed:

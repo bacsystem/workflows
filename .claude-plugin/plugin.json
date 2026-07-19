@@ -1,8 +1,8 @@
 {
   "name": "cys",
-  "version": "0.6.12",
+  "version": "0.6.13",
   "description": "Development methodology skills with parallel plan execution: design, plan, run, check, ship. Named after the author's twin daughters, Cielo y Sophia.",
-  "author": { "name": "bacsystem" },
+  "author": { "name": "Christian Bacilio" },
   "repository": "https://github.com/bacsystem/parallel-plan-executor",
   "license": "MIT",
   "keywords": ["workflow", "parallel", "plan-execution", "methodology"]

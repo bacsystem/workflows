@@ -12,6 +12,32 @@ Java/Spring Boot projects, nothing in the design is tied to a specific language.
 
 Design spec: `docs/cys/specs/2026-07-04-parallel-plan-executor-design.md`.
 
+## See it in action (60 seconds)
+
+One request, in plain language:
+
+> `/cys:flow ~/projects/persons-api "A CRUD REST API for managing person records, Java 17 / Spring Boot 3, MongoDB persistence"`
+
+cys turns that into a spec, a plan, and — the part that's actually
+different from other AI coding tools — a real **parallel** execution.
+From a pilot run of exactly that idea:
+
+| Task | What it built | Ran |
+|---|---|---|
+| 1. Domain model & scaffolding | `Person` document, Maven project | alone — everything else depends on it (9m13s) |
+| 2. Repository | `PersonRepository` | **in parallel** with Task 3 (2m01s) |
+| 3. Service layer | business rules, validation | **in parallel** with Task 2 (1m46s) |
+| 4. Controller | REST endpoints | after 1–3 (2m11s) |
+| 5. Error handling | `GlobalExceptionHandler` | after 1 & 4 (2m56s) |
+
+Tasks 2 and 3 don't depend on each other — cys inferred that from their
+`Consumes`/`Produces` blocks and ran them concurrently instead of one
+after another. Every task went through its own isolated git worktree, an
+adversarial code review, and a serialized merge — you get a PR with a
+whole-branch review verdict, not just green tests. See
+[Reporting bugs](#reporting-bugs) below if anything looks off — the
+final review already writes its own findings to `.cys/pending.md` for you.
+
 ## What kind of thing is this? (plugin? skill? neither)
 
 Neither. This repo is a **`Workflow` script** — a third kind of Claude Code extension,
@@ -31,8 +57,8 @@ plugin** described next.
 ## The cys plugin
 
 **cys** is this repo's skill plugin: five skills covering the whole flow
-**design → plan → run → check → ship**, named after the author's twin daughters,
-**Cielo y Sophia**.
+**design → plan → run → check → ship**, created by Christian Bacilio and named
+after his twin daughters, **Cielo y Sophia**.
 
 | Skill | What it does |
 |---|---|
@@ -469,3 +495,17 @@ plain yes/no dialog (or silent allow) instead of a classifier judgment call.
 - `task-<id>` branches of failed or BLOCKED tasks survive the run on purpose: they
   preserve whatever partial state exists for diagnosis. Clean them up afterwards with
   `git branch -D task-<id>` once you no longer need them.
+
+## Reporting bugs
+
+Open an issue at
+[github.com/bacsystem/parallel-plan-executor/issues](https://github.com/bacsystem/parallel-plan-executor/issues)
+(the bug report template will guide you). The single most useful thing
+you can attach is something cys already generated for you — no need to
+write a fresh repro from scratch:
+
+- `.cys/pending.md`, if the run's final review or a `cys:check` call
+  already logged a finding about this.
+- `.cys/task-<id>-report.md`, for the specific task that misbehaved.
+- `review-*.diff`, if a review flagged something.
+- The exact stderr/stdout of a failing command (e.g. `node bin/parse-plan.js`).
