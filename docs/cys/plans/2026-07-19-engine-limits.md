@@ -473,28 +473,40 @@ git commit -m "feat(validate-args): validate optional maxConcurrency"
 
 - [ ] **Step 1: Write the failing test**
 
-Append to `tests/build-workflow.test.js`:
+`tests/build-workflow.test.js` builds the workflow once at module load
+(`execFileSync('node', [...build-workflow.js])`) and reads the built
+output into a shared `output` constant — reuse that instead of adding a
+new file read. Append:
 
 ```js
-test('el template pasa args.maxConcurrency a runDag', () => {
-  const template = readFileSync(TEMPLATE_PATH, 'utf8');
+test('el template pasa maxConcurrency a runDag', () => {
   assert.match(
-    template,
-    /runDag\(graph, runTask, \{\s*maxConcurrency: args\.maxConcurrency\s*\}\)/,
+    output,
+    /runDag\(graph, runTask, \{\s*maxConcurrency\s*\}\)/,
     'runDag debe recibir el maxConcurrency del usuario, no ignorarlo'
   );
 });
 ```
 
-(If `TEMPLATE_PATH` isn't already a constant in this file, use whatever
-existing constant/helper the file already uses to read the template —
-confirmed at implementation time by checking the file's top imports.)
+Also update two existing tests that hardcode the exact destructured
+shape and break once Step 3 adds `maxConcurrency` to it:
+`'build script embeds the args validation and the template invokes it
+before any agent'` (its `validateIndex` string) and `'built workflow
+names the integration branch explicitly instead of letting agents
+guess'` (its `integrationBranch, executorPath, ... } = resolvedArgs`
+string) — append `, maxConcurrency` to both expected substrings.
 
 - [ ] **Step 2: Run it, expect FAIL**
 
 Run: `node --test tests/build-workflow.test.js`
-Expected: FAIL — the template still calls `runDag(graph, runTask)` with
-no third argument.
+Expected: FAIL on the new test — the template still calls
+`runDag(graph, runTask)` with no third argument. (The updated
+`validateIndex` string may pass "by accident" — it also matches
+`validateWorkflowArgs`'s own function-definition parameter list, inlined
+from `src/validate-args.js`, which already has `maxConcurrency` from
+Task 4, before the template's own call site is touched. That's a
+pre-existing quirk of this indexOf-based test, not something to fix
+here — the new `runDag` test is the real signal.)
 
 - [ ] **Step 3: Wire the template**
 
@@ -520,7 +532,7 @@ Then replace the `runDag` call:
 with:
 
 ```js
-  results = await runDag(graph, runTask, { maxConcurrency: args.maxConcurrency });
+  results = await runDag(graph, runTask, { maxConcurrency });
 ```
 
 - [ ] **Step 4: Regenerate the built workflow**

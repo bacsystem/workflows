@@ -11,9 +11,21 @@ export const meta = {
   ],
 }
 
-async function runDag(graph, taskFn) {
+async function runDag(graph, taskFn, options = {}) {
+  const { maxConcurrency = Infinity } = options;
   const results = new Map();
   const started = new Map();
+
+  let available = maxConcurrency;
+  const waiters = [];
+  const acquire = () => (available > 0
+    ? (available--, Promise.resolve())
+    : new Promise((resolve) => waiters.push(resolve)));
+  const release = () => {
+    const next = waiters.shift();
+    if (next) next();
+    else available++;
+  };
 
   function run(taskId) {
     if (started.has(taskId)) return started.get(taskId);
@@ -36,12 +48,18 @@ async function runDag(graph, taskFn) {
         throw new Error(`task ${taskId} skipped: ${reason}`);
       }
 
+      // El slot de concurrencia se toma acá, después de resolver dependencias — nunca
+      // alrededor del await de arriba. Gatear la espera de dependencias dejaría una tarea
+      // bloqueada ocupando un slot que sus propias dependencias podrían necesitar: deadlock.
+      await acquire();
       try {
         const result = await taskFn(taskId);
         results.set(taskId, { status: 'done', result });
       } catch (error) {
         results.set(taskId, { status: 'failed', error });
         throw error;
+      } finally {
+        release();
       }
     })();
 
@@ -101,7 +119,18 @@ function buildGraphWithDiagnostics(tasks) {
   for (const task of tasks) {
     for (const symbol of task.interfaces.consumes) {
       const producerId = producedBy.get(symbol);
-      if (producerId !== undefined && producerId !== task.id) {
+      if (producerId === undefined) {
+        // Igual de silencioso que un typo hasta ahora: la tarea sigue sin esa dependencia
+        // y nadie se entera. No es error — un símbolo ya presente en el repo antes del
+        // plan es un consumo legítimo sin productor — pero merece el mismo aviso que ya
+        // existe para un productor duplicado o un valor vacío.
+        warnings.push(
+          `Task ${task.id} consumes \`${symbol}\` but no task produces it — ` +
+          `likely a typo or a missing producer task; no dependency was created`
+        );
+        continue;
+      }
+      if (producerId !== task.id) {
         deps.get(task.id).add(producerId);
       }
     }
@@ -135,21 +164,37 @@ function assertAcyclic(graph) {
   const DONE = 2;
   const state = new Map();
 
-  function visit(id, chain) {
-    const current = state.get(id) ?? UNVISITED;
-    if (current === DONE) return;
-    if (current === VISITING) {
-      throw new Error(`Cycle detected in plan dependency graph: ${[...chain, id].join(' -> ')}`);
-    }
-    state.set(id, VISITING);
-    for (const dep of graph[id] ?? []) {
-      visit(dep, [...chain, id]);
-    }
-    state.set(id, DONE);
-  }
+  for (const startId of Object.keys(graph).map(Number)) {
+    if (state.get(startId) === DONE) continue;
 
-  for (const id of Object.keys(graph).map(Number)) {
-    visit(id, []);
+    // Pila explícita en vez de recursión: cada frame lleva el id y un cursor sobre sus
+    // dependencias, para poder "volver" a la mitad de un nodo sin usar la pila de
+    // llamadas de JS — una cadena de miles de tareas encadenadas no debe reventarla.
+    const stack = [{ id: startId, depIndex: 0, chain: [] }];
+    state.set(startId, VISITING);
+
+    while (stack.length > 0) {
+      const frame = stack[stack.length - 1];
+      const deps = graph[frame.id] ?? [];
+
+      if (frame.depIndex >= deps.length) {
+        state.set(frame.id, DONE);
+        stack.pop();
+        continue;
+      }
+
+      const dep = deps[frame.depIndex];
+      frame.depIndex++;
+
+      const depState = state.get(dep) ?? UNVISITED;
+      if (depState === DONE) continue;
+      if (depState === VISITING) {
+        throw new Error(`Cycle detected in plan dependency graph: ${[...frame.chain, frame.id, dep].join(' -> ')}`);
+      }
+
+      state.set(dep, VISITING);
+      stack.push({ id: dep, depIndex: 0, chain: [...frame.chain, frame.id] });
+    }
   }
 }
 
@@ -158,7 +203,7 @@ function assertAcyclic(graph) {
 // un ciclo en ese grafo deja a runDag esperando su propia promesa memoizada para
 // siempre — deadlock sin error ni log. Esta validación corre antes de lanzar cualquier
 // agente para que el fallo sea inmediato y explicable.
-function validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly }) {
+function validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly, maxConcurrency }) {
   if (finishOnly !== undefined && typeof finishOnly !== 'boolean') {
     throw new Error('args.finishOnly must be a boolean when present');
   }
@@ -197,6 +242,16 @@ function validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, o
     // política de "merges requieren autorización humana" de memoria, inconsistentemente
     // entre tareas. Debe ser las palabras textuales del usuario, no un booleano.
     throw new Error('args.mergeAuthorization must be a string (the user\'s own authorization words) when present');
+  }
+  if (
+    maxConcurrency !== undefined &&
+    maxConcurrency !== Infinity &&
+    (!Number.isInteger(maxConcurrency) || maxConcurrency < 1)
+  ) {
+    // Un tope inválido (0, negativo, no entero, no numérico) dejaría el semáforo de
+    // runDag en un estado que nunca libera slots o que nunca los otorga — mejor fallar
+    // rápido acá que deadlockear después de haber lanzado agentes.
+    throw new Error('args.maxConcurrency must be Infinity or a positive integer when present');
   }
 
   assertUniqueTaskIds(tasks);
@@ -257,8 +312,8 @@ function formatDuration(startedAt, finishedAt) {
 // invocado la tool (comprobado en el piloto 2026-07-15): destructurar el string daba
 // tasks undefined y un error que culpaba al campo equivocado.
 const resolvedArgs = typeof args === 'string' ? JSON.parse(args) : args;
-const { graph, tasks, planPath, repoPath, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly } = resolvedArgs;
-validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly }); // falla rápido y claro, nunca deadlock
+const { graph, tasks, planPath, repoPath, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly, maxConcurrency } = resolvedArgs;
+validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly, maxConcurrency }); // falla rápido y claro, nunca deadlock
 const tasksById = new Map(tasks.map((t) => [t.id, t]));
 
 // Fase 4b: snapshot completo del estado de cada tarea, para que una sesión futura (no
@@ -644,7 +699,7 @@ async function executeTask(taskId) {
 let results = new Map();
 if (!finishOnly) {
   await writeState();
-  results = await runDag(graph, runTask);
+  results = await runDag(graph, runTask, { maxConcurrency });
   // Las tareas skipped nunca pasan por runTask; reconciliar para que la barra cierre en N/N.
   settledCount = results.size;
   log(`${progressBar()} — ejecución terminada`);
