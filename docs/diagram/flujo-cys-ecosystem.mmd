@@ -1,0 +1,53 @@
+flowchart TD
+    subgraph DESIGN["1 · cys:design"]
+        D1["Idea del usuario"]
+        D2["Diálogo: contexto,<br/>preguntas de a una,<br/>2-3 enfoques"]
+        D3["docs/cys/specs/*.md"]
+        D1 --> D2 --> D3
+    end
+
+    GATE1{"Gate humano:<br/>¿usuario aprueba<br/>el spec?"}
+    D3 --> GATE1
+    GATE1 -- "no, cambios" --> D2
+    GATE1 -- "sí" --> PLAN
+
+    subgraph PLAN["2 · cys:plan"]
+        P1["Tareas numeradas<br/>Files + Consumes/Produces"]
+        P2["docs/cys/plans/*.md"]
+        P3["bin/parse-plan.js<br/>dry-run del grafo"]
+        P1 --> P2 --> P3
+    end
+
+    PLAN --> RUN
+
+    subgraph RUN["3 · cys:run (Claude Code únicamente)"]
+        R1["DAG inferido del plan"]
+        R2["worktree + implement + review<br/>adversarial + merge serializado,<br/>por tarea, en paralelo cuando<br/>el DAG lo permite"]
+        R3["ramas task-&lt;id&gt; mergeadas<br/>+ .cys/ (briefs, reportes, diffs)"]
+        R1 --> R2 --> R3
+    end
+
+    RUN --> CHECK
+
+    subgraph CHECK["4 · cys:check (opcional)"]
+        C1["Revisión adicional sobre<br/>una rama ya lista"]
+        C2["Verdicts + hallazgos<br/>a .cys/pending.md"]
+        C1 --> C2
+    end
+
+    CHECK --> SHIP
+    RUN -.-> SHIP
+
+    subgraph SHIP["5 · cys:ship"]
+        S1["Clasifica el cambio,<br/>calcula SemVer"]
+        S2["CHANGELOG + branch +<br/>commit + PR"]
+        S1 --> S2
+    end
+
+    GATE2{"Gate humano:<br/>¿usuario mergea<br/>el PR?"}
+    S2 --> GATE2
+    GATE2 -- "sí" --> DONE["Cambio integrado"]
+
+    style GATE1 fill:#8a6d1a,color:#fff
+    style GATE2 fill:#8a6d1a,color:#fff
+    style DONE fill:#1a6b2a,color:#fff

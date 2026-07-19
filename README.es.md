@@ -12,6 +12,9 @@ Node y en Java/Spring Boot, y no hay nada en el diseño atado a un lenguaje en p
 
 Spec de diseño: `docs/cys/specs/2026-07-04-parallel-plan-executor-design.md`.
 
+Flujo del ecosistema (las 5 skills, sus artefactos, y los gates humanos
+de aprobación): `docs/diagram/flujo-cys-ecosystem.mmd`.
+
 ## Viéndolo en acción (60 segundos)
 
 Un solo pedido, en lenguaje natural:

@@ -24,6 +24,25 @@ Both items originated from the same external code-review prompt (dated
 Versioned as 0.6.17 (one ahead of both already-open PRs) to avoid a
 version collision when all three merge to `develop`.
 
+## 0.6.16 — 2026-07-19
+
+Added:
+
+- `examples/hello-parallel/`: a minimal, real, parseable plan whose own
+  dependency graph shows genuine inferred parallelism — two independent
+  tasks with no edge between them, not a description of parallel
+  execution. Tested so it can't silently rot if the parser changes.
+- `docs/diagram/flujo-cys-ecosystem.mmd`: a Mermaid diagram of the whole
+  5-skill flow (`design → plan → run → check → ship`), each stage's
+  input/output artifact, and the two human approval gates. Linked from
+  both READMEs and `cys:guide`'s stage table.
+
+Both items originated from the same external code-review prompt (dated
+2026-07-19) as the `feat/engine-limits` branch (v0.6.15) — see
+`docs/cys/specs/2026-07-19-onboarding-design.md`. Versioned as 0.6.16
+(one ahead of the already-open `feat/engine-limits` PR) to avoid a
+version-number collision when both merge to `develop`.
+
 ## 0.6.15 — 2026-07-19
 
 Added:
