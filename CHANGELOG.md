@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.17 — 2026-07-19
+
+Added:
+
+- `CONTRIBUTING.md`: codifies the repo's evidence-driven discipline (a
+  behavior change needs a test tracing to a real finding plus a comment
+  explaining why), the TDD/one-commit-per-fix workflow, the
+  never-hand-edit-the-generated-file rule, and the open-PR check before
+  opening a new one.
+- `cys:guide` gained a "When cys is overhead" section: the full flow is
+  real overhead for a one-line fix or trivial exploration — worth saying
+  honestly, not just documenting when to use the tool.
+
+Both items originated from the same external code-review prompt (dated
+2026-07-19) as `feat/engine-limits` (v0.6.15) and `docs/onboarding`
+(v0.6.16) — see `docs/cys/specs/2026-07-19-contributing-design.md`.
+Versioned as 0.6.17 (one ahead of both already-open PRs) to avoid a
+version collision when all three merge to `develop`.
+
 ## 0.6.16 — 2026-07-19
 
 Added:

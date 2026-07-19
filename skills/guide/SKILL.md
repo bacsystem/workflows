@@ -94,3 +94,13 @@ review finding is left unresolved — see `cys:check`.
   serializes what must be serial (shared files, Consumes/Produces
   dependencies) and parallelizes the rest.
 - No agent-performed PR merges, ever.
+
+## When cys is overhead
+
+The full flow — worktrees, adversarial review, serialized merge — earns
+its keep when a change has several tasks, non-trivial dependencies, or
+where inferred parallelism actually saves wall-clock time. It's real
+overhead for a one-line fix, a trivial exploration, or anything you'd
+finish faster just doing it by hand. Use your judgment; cys respecting
+your time includes not routing small changes through the whole flow
+just because the tool exists.

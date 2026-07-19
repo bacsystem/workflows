@@ -265,3 +265,11 @@ test('plan documenta el fallback de hand-off cuando cys:run no está disponible 
     'cys:plan debe mencionar qué hacer en plataformas sin cys:run (Cursor, Gemini CLI)'
   );
 });
+
+test('guide dice honestamente cuándo cys:run es overhead y conviene un fix a mano', () => {
+  const guide = readFileSync(path.join(skillsDir, 'guide', 'SKILL.md'), 'utf8');
+  assert.ok(
+    guide.includes('When cys is overhead'),
+    'cys:guide debe decir cuándo el flujo completo no vale la pena, no solo cuándo usarlo'
+  );
+});
