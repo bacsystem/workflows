@@ -89,20 +89,36 @@ export function assertAcyclic(graph) {
   const DONE = 2;
   const state = new Map();
 
-  function visit(id, chain) {
-    const current = state.get(id) ?? UNVISITED;
-    if (current === DONE) return;
-    if (current === VISITING) {
-      throw new Error(`Cycle detected in plan dependency graph: ${[...chain, id].join(' -> ')}`);
-    }
-    state.set(id, VISITING);
-    for (const dep of graph[id] ?? []) {
-      visit(dep, [...chain, id]);
-    }
-    state.set(id, DONE);
-  }
+  for (const startId of Object.keys(graph).map(Number)) {
+    if (state.get(startId) === DONE) continue;
 
-  for (const id of Object.keys(graph).map(Number)) {
-    visit(id, []);
+    // Pila explícita en vez de recursión: cada frame lleva el id y un cursor sobre sus
+    // dependencias, para poder "volver" a la mitad de un nodo sin usar la pila de
+    // llamadas de JS — una cadena de miles de tareas encadenadas no debe reventarla.
+    const stack = [{ id: startId, depIndex: 0, chain: [] }];
+    state.set(startId, VISITING);
+
+    while (stack.length > 0) {
+      const frame = stack[stack.length - 1];
+      const deps = graph[frame.id] ?? [];
+
+      if (frame.depIndex >= deps.length) {
+        state.set(frame.id, DONE);
+        stack.pop();
+        continue;
+      }
+
+      const dep = deps[frame.depIndex];
+      frame.depIndex++;
+
+      const depState = state.get(dep) ?? UNVISITED;
+      if (depState === DONE) continue;
+      if (depState === VISITING) {
+        throw new Error(`Cycle detected in plan dependency graph: ${[...frame.chain, frame.id, dep].join(' -> ')}`);
+      }
+
+      state.set(dep, VISITING);
+      stack.push({ id: dep, depIndex: 0, chain: [...frame.chain, frame.id] });
+    }
   }
 }

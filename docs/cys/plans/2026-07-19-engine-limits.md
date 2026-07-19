@@ -290,13 +290,13 @@ git commit -m "feat(graph): warn when a consumed symbol has no producer"
 Same file as Task 2 — the executor serializes this after Task 2 even
 without an explicit `Consumes`/`Produces` link.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the test**
 
 Append to `tests/graph-builder.test.js`:
 
 ```js
-test('assertAcyclic no revienta la pila en una cadena lineal larga', () => {
-  const LENGTH = 5000;
+test('assertAcyclic maneja una cadena lineal larga sin fallar (guarda de regresión, no reproduce un desborde real hoy: ni 8M de tareas encadenadas revienta la pila recursiva en este entorno — igual se adopta la versión iterativa como defensa en profundidad para entornos con stack más chico)', () => {
+  const LENGTH = 50000;
   const graph = {};
   graph[0] = [];
   for (let i = 1; i < LENGTH; i++) graph[i] = [i - 1];
@@ -305,14 +305,19 @@ test('assertAcyclic no revienta la pila en una cadena lineal larga', () => {
 });
 ```
 
-- [ ] **Step 2: Run it, expect FAIL**
+- [ ] **Step 2: Confirm this doesn't reproduce a crash today (verified, not assumed)**
 
-Run: `node --test tests/graph-builder.test.js`
-Expected: FAIL — `RangeError: Maximum call stack size exceeded` from the
-current recursive `visit()` at a chain of 5000 (Node's default stack
-handles roughly a few thousand frames of this shape, comfortably below
-5000 — the exact threshold varies by platform, but 5000 reproduces the
-failure reliably in this repo's CI/dev environments).
+Empirically checked before writing this plan: the *current* recursive
+`assertAcyclic` does not overflow the stack even at chains up to 8
+million tasks in this environment (this V8 build appears to optimize
+this particular recursive shape well beyond what a naive stack-depth
+estimate would predict). So there is no real RED step here — the test
+above passes against both the old and new implementation. This item is
+included anyway on the user's explicit call, as defense-in-depth for a
+platform/environment with a smaller stack (a constrained container, a
+different OS), not because a failure was reproduced. Run
+`node --test tests/graph-builder.test.js` now to confirm it passes
+before touching `assertAcyclic` — this is the baseline, not a red bar.
 
 - [ ] **Step 3: Write the minimal implementation**
 

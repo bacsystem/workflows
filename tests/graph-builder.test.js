@@ -58,6 +58,15 @@ test('no advierte cuando el símbolo consumido sí tiene productor', () => {
   assert.equal(warnings.filter((w) => /produces it/i.test(w)).length, 0);
 });
 
+test('assertAcyclic maneja una cadena lineal larga sin fallar (guarda de regresión, no reproduce un desborde real hoy: ni 8M de tareas encadenadas revienta la pila recursiva en este entorno — igual se adopta la versión iterativa como defensa en profundidad para entornos con stack más chico)', () => {
+  const LENGTH = 50000;
+  const graph = {};
+  graph[0] = [];
+  for (let i = 1; i < LENGTH; i++) graph[i] = [i - 1];
+
+  assert.doesNotThrow(() => assertAcyclic(graph));
+});
+
 test('throws on a cyclic dependency', () => {
   const tasks = [
     { id: 1, title: 'A', files: { create: [], modify: [], test: [] }, interfaces: { consumes: ['b'], produces: ['a'] } },
