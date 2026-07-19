@@ -12,6 +12,9 @@ Java/Spring Boot projects, nothing in the design is tied to a specific language.
 
 Design spec: `docs/cys/specs/2026-07-04-parallel-plan-executor-design.md`.
 
+Ecosystem flow (all 5 skills, their artifacts, and the human approval
+gates): `docs/diagram/flujo-cys-ecosystem.mmd`.
+
 ## See it in action (60 seconds)
 
 One request, in plain language:

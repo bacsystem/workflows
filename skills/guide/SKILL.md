@@ -18,6 +18,10 @@ Five stages, five skills — each stage's output is the next stage's input.
 | 4. Check | `cys:check` | change → verdicts (spec PASS/FAIL + quality APPROVED/NEEDS_FIXES) |
 | 5. Ship | `cys:ship` | working tree → Conventional Commit, SemVer bump, PR |
 
+See `docs/diagram/flujo-cys-ecosystem.mmd` for this same flow as a
+diagram, with each stage's input/output artifact and the two human gates
+(spec approval, PR merge).
+
 Stage 3 is what makes cys different: independent plan tasks execute in
 PARALLEL via a dependency DAG inferred from each task's Consumes/Produces
 block — not one at a time. Stage 4 runs automatically inside stage 3 for
