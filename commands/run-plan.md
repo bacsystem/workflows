@@ -63,7 +63,7 @@ REPO = `${CLAUDE_PLUGIN_ROOT}`
      already merged in the earlier run — nothing to implement, only the
      final whole-branch review and handoff never finished. Tell the user
      this, skip steps 5 and 7 below (no new merges, no new branch), and
-     launch (step 8) with `finishOnly: true` and empty `tasks`/`graph`
+     launch (step 9) with `finishOnly: true` and empty `tasks`/`graph`
      instead of what `plan-remainder.js` printed for those two fields.
 
 5. **Ask what's still missing** (skip this step if `allDone` was `true`),
@@ -95,18 +95,28 @@ REPO = `${CLAUDE_PLUGIN_ROOT}`
    refspec from that branch would push straight to `develop`. Reported by
    a real user who hit exactly this.
 
-8. **Launch**: invoke the `Workflow` tool with:
+8. **Ensure `.cys/` is gitignored**: check whether `<repo-path>/.gitignore`
+   already has a `.cys/` entry (a line matching `.cys/`, `.cys`, or a
+   broader pattern that already covers it). If not, append `.cys/` to
+   `.gitignore` (create the file if it doesn't exist) and commit that
+   one-line addition now, before the run writes anything there — task
+   briefs/reports, review diffs, `handoff.md`, `pending.md`, and
+   `progress.md` should never risk landing in the target repo's history.
+   Reported by a real user who found 21 untracked `.cys/*` files sitting
+   in a project that had never had this checked.
+
+9. **Launch**: invoke the `Workflow` tool with:
    - `scriptPath`: `<REPO>/workflows/parallel-plan-executor.js`
    - `args`: if `allDone` was `true`, `{ tasks: [], graph: {}, planPath, repoPath, integrationBranch, executorPath: <REPO>, finishOnly: true, openPr, pr }` (no `mergeAuthorization` — nothing merges in this mode). Otherwise,
      `{ tasks, graph, planPath, repoPath, integrationBranch, executorPath: <REPO>, openPr, pr, mergeAuthorization }`
      (executorPath is REPO — the workflow invokes REPO/bin scripts by exact path;
      omit `openPr`/`pr`/`mergeAuthorization` if not provided)
 
-9. **After launching**: tell the user it's running in the background, mention they can
+10. **After launching**: tell the user it's running in the background, mention they can
    ask "how's the workflow going?" any time or open `/workflows`, and that you'll report
    back when it finishes or if a merge needs authorization.
 
-10. **Offer the manual retry guide** (skip entirely if `allDone` was
+11. **Offer the manual retry guide** (skip entirely if `allDone` was
     `true` — the run finishes immediately, nothing to resume): ask one
     question, in plain language — whether they want the copy-paste text
     for a Claude Code Desktop Local Routine that resumes this run

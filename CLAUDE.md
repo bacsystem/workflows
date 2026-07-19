@@ -35,3 +35,5 @@ Design spec: `docs/cys/specs/2026-07-04-parallel-plan-executor-design.md` (§7 d
 ## Branches
 
 Work happens on feature/fix branches off `develop`; PRs target `develop`, and `main` is the release branch.
+
+Before opening a new PR, check for an already-open one against the same base branch first (`gh pr list --state open --base develop`). If one exists and touches overlapping files, flag it and wait for it to merge (or coordinate explicitly) instead of opening the new PR right away — parallel PRs touching `commands/flow.md`/`commands/run-plan.md` or the version files (`package.json`, `CHANGELOG.md`, the `plugin.json`s) have caused real merge conflicts and version-number collisions that had to be reconciled by hand.

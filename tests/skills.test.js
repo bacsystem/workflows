@@ -225,3 +225,14 @@ test('design exige verificar empíricamente restricciones de entorno en vez de h
     'cys:design debe exigir verificar restricciones de entorno en vez de heredarlas de otro spec/pilot'
   );
 });
+
+test('los comandos aseguran que .cys/ esté en .gitignore del repo destino antes de lanzar (hallazgo real: 21 archivos untracked listos para commitearse por accidente)', () => {
+  const flow = readFileSync(path.join(root, 'commands', 'flow.md'), 'utf8');
+  const runPlan = readFileSync(path.join(root, 'commands', 'run-plan.md'), 'utf8');
+  for (const [name, content] of [['flow.md', flow], ['run-plan.md', runPlan]]) {
+    assert.ok(
+      content.includes('Ensure `.cys/` is gitignored'),
+      `commands/${name} debe verificar y asegurar que .cys/ esté en .gitignore antes de que el run escriba ahí`
+    );
+  }
+});
