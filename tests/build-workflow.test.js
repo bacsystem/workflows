@@ -395,3 +395,18 @@ test('built workflow forces a real merge commit for task integrations, never a s
     'sin --no-ff, git hace fast-forward cuando puede, dejando un historial inconsistente entre tareas según el orden real de ejecución'
   );
 });
+
+test('el resumen final incluye conteos de resultado, ancho de paralelismo y trabajo secuencial vs. ventana de pared', () => {
+  assert.ok(
+    output.includes('computeParallelWidth(graph)'),
+    'el resumen debe calcular el ancho de paralelismo inferido del plan'
+  );
+  assert.ok(
+    output.includes('Sequential-equivalent') || output.includes('secuencial'),
+    'el resumen debe mostrar el trabajo secuencial equivalente'
+  );
+  assert.ok(
+    !output.includes('speedup') && !output.includes('Nx faster') && !output.includes('veces más rápido'),
+    'el resumen no debe inventar un número de speedup — solo mostrar los datos'
+  );
+});

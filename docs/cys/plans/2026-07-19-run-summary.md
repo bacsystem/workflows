@@ -127,7 +127,7 @@ test('el resumen final incluye conteos de resultado, ancho de paralelismo y trab
     'el resumen debe calcular el ancho de paralelismo inferido del plan'
   );
   assert.ok(
-    output.includes('sequential-equivalent') || output.includes('secuencial'),
+    output.includes('Sequential-equivalent') || output.includes('secuencial'),
     'el resumen debe mostrar el trabajo secuencial equivalente'
   );
   assert.ok(
