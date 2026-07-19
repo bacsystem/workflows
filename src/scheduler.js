@@ -1,6 +1,18 @@
-export async function runDag(graph, taskFn) {
+export async function runDag(graph, taskFn, options = {}) {
+  const { maxConcurrency = Infinity } = options;
   const results = new Map();
   const started = new Map();
+
+  let available = maxConcurrency;
+  const waiters = [];
+  const acquire = () => (available > 0
+    ? (available--, Promise.resolve())
+    : new Promise((resolve) => waiters.push(resolve)));
+  const release = () => {
+    const next = waiters.shift();
+    if (next) next();
+    else available++;
+  };
 
   function run(taskId) {
     if (started.has(taskId)) return started.get(taskId);
@@ -23,12 +35,18 @@ export async function runDag(graph, taskFn) {
         throw new Error(`task ${taskId} skipped: ${reason}`);
       }
 
+      // El slot de concurrencia se toma acá, después de resolver dependencias — nunca
+      // alrededor del await de arriba. Gatear la espera de dependencias dejaría una tarea
+      // bloqueada ocupando un slot que sus propias dependencias podrían necesitar: deadlock.
+      await acquire();
       try {
         const result = await taskFn(taskId);
         results.set(taskId, { status: 'done', result });
       } catch (error) {
         results.set(taskId, { status: 'failed', error });
         throw error;
+      } finally {
+        release();
       }
     })();
 

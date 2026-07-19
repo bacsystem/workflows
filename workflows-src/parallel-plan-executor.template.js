@@ -21,8 +21,8 @@ export const meta = {
 // invocado la tool (comprobado en el piloto 2026-07-15): destructurar el string daba
 // tasks undefined y un error que culpaba al campo equivocado.
 const resolvedArgs = typeof args === 'string' ? JSON.parse(args) : args;
-const { graph, tasks, planPath, repoPath, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly } = resolvedArgs;
-validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly }); // falla rápido y claro, nunca deadlock
+const { graph, tasks, planPath, repoPath, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly, maxConcurrency } = resolvedArgs;
+validateWorkflowArgs({ tasks, graph, integrationBranch, executorPath, openPr, pr, mergeAuthorization, finishOnly, maxConcurrency }); // falla rápido y claro, nunca deadlock
 const tasksById = new Map(tasks.map((t) => [t.id, t]));
 
 // Fase 4b: snapshot completo del estado de cada tarea, para que una sesión futura (no
@@ -408,7 +408,7 @@ async function executeTask(taskId) {
 let results = new Map();
 if (!finishOnly) {
   await writeState();
-  results = await runDag(graph, runTask);
+  results = await runDag(graph, runTask, { maxConcurrency });
   // Las tareas skipped nunca pasan por runTask; reconciliar para que la barra cierre en N/N.
   settledCount = results.size;
   log(`${progressBar()} — ejecución terminada`);

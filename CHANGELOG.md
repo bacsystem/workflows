@@ -24,6 +24,41 @@ Both items originated from the same external code-review prompt (dated
 Versioned as 0.6.17 (one ahead of both already-open PRs) to avoid a
 version collision when all three merge to `develop`.
 
+## 0.6.15 — 2026-07-19
+
+Added:
+
+- `maxConcurrency` (optional `args` field, default unlimited): caps how
+  many tasks `cys:run` executes at once within a DAG layer. The Claude
+  Code `Workflow` tool already queues `agent()` calls beyond its own
+  `min(16, cores-2)` cap, so this is mainly useful to go lower than that
+  default — e.g. to avoid many simultaneous local git worktrees for a
+  plan with a wide layer of independent tasks. Wired through
+  `src/scheduler.js` (`runDag`'s new third param, semaphore gated after
+  dependency resolution to avoid deadlock), `src/validate-args.js`, and
+  the workflow template; documented in both READMEs.
+- `src/graph-builder.js` now warns when a task's `Consumes` symbol has
+  no producing task anywhere in the plan — the same silent-dependency-
+  loss family as the empty-value parser bug fixed earlier this session,
+  just never covered before.
+
+Changed:
+
+- `assertAcyclic` is now iterative instead of recursive, as defense-in-
+  depth against a smaller stack on a different platform/container.
+  Behavior is unchanged (same cycle-detection message format, same
+  tests pass) — empirically, the recursive version didn't overflow the
+  stack even at 8 million chained tasks in this environment, so this
+  isn't fixing a reproduced failure, just hardening for one that hasn't
+  been observed.
+
+All three items originated from an external code-review prompt (dated
+2026-07-19) that read the full repo; each was independently re-verified
+against the actual current code before being accepted, and one item
+from that same prompt (a stack-overflow risk assumed for `assertAcyclic`
+at "hundreds of tasks") was found not to reproduce even at 8M — recorded
+in `docs/cys/specs/2026-07-19-engine-limits-design.md`.
+
 ## 0.6.14 — 2026-07-19
 
 Added:
