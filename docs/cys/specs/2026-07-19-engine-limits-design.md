@@ -63,12 +63,22 @@ indistinguishable from a typo by the parser alone.
 The current DFS (`src/graph-builder.js`) recurses one stack frame per
 edge in the dependency **chain** being walked (not per task in a
 layer — width doesn't add stack depth, only chain depth does). Real
-plans run 5–40 tasks total, nowhere near a depth that would matter. This
-item is included on the user's explicit call ("es bueno tener en cuenta
-las sugerencias") even without a concrete incident, on the same
-evidence-first terms as A1 — build it now, since it's cheap and the
-correctness case is easy to verify, but it's not fixing an observed
-failure.
+plans run 5–40 tasks total, nowhere near a depth that would matter.
+
+**Empirically checked before implementing** (not assumed): the
+recursive version does not overflow the stack even at 8 million chained
+tasks in this environment — this V8 build handles this particular
+recursive shape far past any naive stack-depth estimate. So this item
+has no reproducible failure behind it at all, at any scale a real plan
+could plausibly reach. It's included anyway on the user's explicit call
+("es bueno tener en cuenta las sugerencias, validamos contra el código")
+as defense-in-depth for a platform with a smaller stack (a constrained
+container, a different OS/Node build) — cheap to build, behavior-
+identical to the recursive version, verified by reusing the exact same
+cycle-detection tests. The corresponding test in the plan is framed as
+a regression/behavior-equivalence guard, not a red-bar stack-overflow
+reproduction — being honest about that distinction in the test's own
+name and the commit message.
 
 ## Testing
 
