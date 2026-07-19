@@ -106,6 +106,9 @@ Each step is one 2-5 minute action, with complete content — never
 
 ## Hand off
 
-After saving the plan, hand off to execution: launch with cys:run
-(or tell the user to run /cys:run-plan). Do NOT offer sequential execution
-paths — parallel execution via the DAG is the cys default.
+After saving the plan, hand off to execution: on Claude Code, launch
+with cys:run (or tell the user to run /cys:run-plan) — do NOT offer
+sequential execution as a substitute; parallel execution via the DAG is
+the cys default there. On platforms where cys:run isn't available
+(Cursor, Gemini CLI), tell the user to execute the plan's tasks
+themselves in dependency order, per cys:guide's fallback note.

@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.14 — 2026-07-19
+
+Added:
+
+- Gemini CLI portability: `gemini-extension.json` makes cys installable
+  via `gemini extensions install <url>`, which clones the whole repo and
+  auto-discovers the existing `skills/` directory by pure directory-name
+  convention — no manifest field, no copying, no symlinks needed (simpler
+  than the Cursor port, which needs a `"skills"` path field). Re-verified
+  the day before that Gemini CLI's Agent Skills feature (stable since
+  v0.44.0) activates in the same conversation thread as a same-shape
+  match to Claude Code's Skill tool, not a separate-context subagent as
+  first assumed when this was deferred on 2026-07-18.
+- "Gemini CLI" install section in both READMEs, alongside the existing
+  Claude Code and Cursor ones.
+
+Changed:
+
+- `skills/guide/SKILL.md` and `skills/plan/SKILL.md`: the platform-
+  fallback note (what to do when `cys:run` isn't available) now names
+  Gemini CLI alongside Cursor instead of Cursor alone — still a single
+  shared paragraph, no per-platform fork.
+
+Out of scope (tracked in `.cys/pending.md` if picked up later): porting
+`cys:run` itself to Gemini CLI's subagents.
+
 ## 0.6.13 — 2026-07-19
 
 Added:

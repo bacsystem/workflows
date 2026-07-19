@@ -177,12 +177,13 @@ test('.cursor-plugin/plugin.json comparte el mismo directorio de skills, sin for
   );
 });
 
-test('guide documenta la alternativa manual cuando cys:run no está disponible (Cursor)', () => {
+test('guide documenta la alternativa manual cuando cys:run no está disponible (Cursor, Gemini CLI)', () => {
   const guide = readFileSync(path.join(skillsDir, 'guide', 'SKILL.md'), 'utf8');
   assert.ok(
-    guide.includes('On Cursor,') &&
+    guide.includes('Cursor') &&
+      guide.includes('Gemini CLI') &&
       guide.includes('execute its tasks yourself in dependency order'),
-    'cys:guide debe explicar qué hacer cuando cys:run no está disponible (Cursor, por ahora)'
+    'cys:guide debe explicar qué hacer cuando cys:run no está disponible (Cursor, Gemini CLI)'
   );
 });
 
@@ -235,4 +236,32 @@ test('los comandos aseguran que .cys/ esté en .gitignore del repo destino antes
       `commands/${name} debe verificar y asegurar que .cys/ esté en .gitignore antes de que el run escriba ahí`
     );
   }
+});
+
+test('gemini-extension.json declara la extensión cys, en lockstep de versión (Gemini CLI portability)', () => {
+  const geminiManifest = JSON.parse(readFileSync(path.join(root, 'gemini-extension.json'), 'utf8'));
+  const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
+  assert.equal(geminiManifest.name, 'cys');
+  assert.ok(geminiManifest.description && geminiManifest.description.length > 0);
+  assert.equal(
+    geminiManifest.version,
+    pkg.version,
+    'sin este candado, un bump de versión deja el manifest de Gemini desincronizado en silencio'
+  );
+});
+
+test('skills/run/ no existe: cys:run queda fuera del auto-discovery de Gemini CLI', () => {
+  assert.equal(
+    existsSync(path.join(skillsDir, 'run')),
+    false,
+    'una carpeta skills/run/ expondría cys:run por convención de Gemini, rompiendo el scope de este port'
+  );
+});
+
+test('plan documenta el fallback de hand-off cuando cys:run no está disponible (Cursor, Gemini CLI)', () => {
+  const plan = readFileSync(path.join(skillsDir, 'plan', 'SKILL.md'), 'utf8');
+  assert.ok(
+    plan.includes('Cursor') && plan.includes('Gemini CLI'),
+    'cys:plan debe mencionar qué hacer en plataformas sin cys:run (Cursor, Gemini CLI)'
+  );
 });
