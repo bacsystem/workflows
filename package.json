@@ -1,6 +1,6 @@
 {
   "name": "parallel-plan-executor",
-  "version": "0.6.19",
+  "version": "0.6.20",
   "author": "Christian Bacilio",
   "private": true,
   "type": "module",
