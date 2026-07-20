@@ -30,3 +30,14 @@ test('CLI emite warnings de productor duplicado en stderr y en el JSON, sin ensu
 test('CLI exits non-zero with a usage message when no path is given', () => {
   assert.throws(() => execFileSync('node', [cliPath], { encoding: 'utf8' }));
 });
+
+test('el comando publicado en examples/README.md imprime el grafo que ese README promete', () => {
+  // examples/README.md muestra `node bin/parse-plan.js examples/hello-parallel/plan.md`
+  // como el primer contacto de un dev nuevo con cys — si el CLI cambia de forma
+  // incompatible, este test debe romperse ANTES que el README quede mintiendo.
+  const examplePath = path.join(root, 'examples', 'hello-parallel', 'plan.md');
+  const output = execFileSync('node', [cliPath, examplePath], { encoding: 'utf8' });
+  const parsed = JSON.parse(output);
+
+  assert.deepEqual(parsed.graph, { 1: [], 2: [1], 3: [1], 4: [2, 3] });
+});
