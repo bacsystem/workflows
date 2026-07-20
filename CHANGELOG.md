@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.20 — 2026-07-19
+
+Added:
+
+- `tests/parse-plan-cli.test.js` now runs the exact command
+  `examples/README.md` tells a new dev to copy-paste
+  (`node bin/parse-plan.js examples/hello-parallel/plan.md`) and asserts
+  its printed graph — closes a gap where `tests/examples.test.js` only
+  exercised `parsePlan`/`buildGraph` directly, so a CLI-level regression
+  in argument handling or JSON serialization could break the README's
+  published first-contact command without failing any test.
+
+From a follow-up external review of the previous rollout (v0.6.15-0.6.19):
+one of its two flagged items (documenting `assertAcyclic` as "evaluated
+and deferred") turned out to rest on a stale premise — `assertAcyclic`
+was already made iterative in v0.6.15, not deferred — so nothing was
+done there; the other (this CLI gap) was real and is fixed by this
+release.
+
 ## 0.6.19 — 2026-07-19
 
 Changed:
