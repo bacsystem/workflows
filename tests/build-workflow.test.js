@@ -343,6 +343,20 @@ test('built workflow instructs the ledger-append agent to spot-check the line ag
   );
 });
 
+test('built workflow coalesces concurrent state-write requests instead of dispatching one [state] agent per settle()/markInProgress() call', () => {
+  const requestIndex = output.indexOf('function requestWriteState()');
+  assert.ok(requestIndex >= 0, 'debe existir requestWriteState(), el wrapper de coalescing sobre writeState()');
+  const requestBody = output.slice(requestIndex, requestIndex + 500);
+  assert.ok(
+    requestBody.includes('stateWriteDirty') && requestBody.includes('while'),
+    'el coalescing debe usar una bandera "dirty" y un loop que reintente mientras haya pedidos nuevos, no lanzar un agente por cada llamada'
+  );
+  assert.ok(
+    output.includes('await requestWriteState()') && output.includes('return requestWriteState()'),
+    'settle() y markInProgress() deben pasar por requestWriteState(), no llamar a writeState() directo (si no, el coalescing no tiene efecto)'
+  );
+});
+
 test('built workflow adds updatedAt to .cys/state.json via the write agent\'s own date command (pending.md gap, Fase 4b design)', () => {
   const writeStateIndex = output.indexOf('function writeState()');
   assert.ok(writeStateIndex >= 0, 'debe existir writeState()');

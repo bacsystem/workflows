@@ -58,15 +58,39 @@ function writeState() {
     `correction). Keep the exact same JSON shape and field vocabulary the other task entries in ` +
     `this content already use (don't invent new status values or fields). Only refuse to write ` +
     `if something looks actually fabricated rather than merely stale — e.g. a "done" entry ` +
-    `whose branch/SHA doesn't ` +
-    `actually fabricated rather than merely stale — e.g. a "done" entry whose branch/SHA doesn't ` +
-    `exist anywhere in the repo's history at all. Write the (corrected, if needed) content ` +
+    `whose branch/SHA doesn't exist anywhere in the repo's history at all. Write the ` +
+    `(corrected, if needed) content ` +
     `between the <content> tags to .cys/state.json (create the file/directory if missing, ` +
     `overwrite anything already there), with "updatedAt": "<time from date>" inserted as a ` +
     `top-level field right after "integrationBranch", and nothing else.` +
     `\n<content>${stateJson()}</content>`,
     { label: 'state', phase: 'State' }
   ));
+}
+
+// Coalesces concurrent state-write requests into one dispatched agent per
+// "wave" instead of one per settle()/markInProgress() call: several tasks
+// settling close together (a common real pattern — e.g. every dependency-
+// free task starting around the same time) used to fire one [state] agent
+// each. If a write is already in flight when a new request comes in, this
+// just flags "there's more to record" and lets the in-flight write's own
+// follow-up pass (which reads taskStates — and so stateJson() — fresh at
+// that later point) pick it up, rather than spawning another agent. Still
+// writes at least once per wave, so crash-resume safety is unchanged; the
+// count of actual [state] agents drops with how much settling clusters.
+let stateWriteChain = null;
+let stateWriteDirty = false;
+function requestWriteState() {
+  stateWriteDirty = true;
+  if (stateWriteChain) return stateWriteChain;
+  stateWriteChain = (async () => {
+    while (stateWriteDirty) {
+      stateWriteDirty = false;
+      await writeState();
+    }
+    stateWriteChain = null;
+  })();
+  return stateWriteChain;
 }
 
 function deleteState() {
@@ -181,7 +205,7 @@ async function settle(taskId, status, label, extra = {}) {
   settledCount += 1;
   taskStates.set(taskId, { status, ...extra });
   log(`${progressBar()} — Task ${taskId} (branch task-${taskId}) ${label}`);
-  await writeState();
+  await requestWriteState();
 }
 
 // Sin esto, .cys/state.json muestra 'pending' desde que arranca la corrida hasta que la
@@ -191,7 +215,7 @@ async function settle(taskId, status, label, extra = {}) {
 // leyendo state.json durante una corrida en curso.
 function markInProgress(taskId, phase) {
   taskStates.set(taskId, { status: 'in_progress', phase });
-  return writeState();
+  return requestWriteState();
 }
 
 // agent() devuelve null si el usuario saltea el agente o si murió por un error terminal
