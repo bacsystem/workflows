@@ -64,7 +64,9 @@ function writeState() {
     `overwrite anything already there), with "updatedAt": "<time from date>" inserted as a ` +
     `top-level field right after "integrationBranch", and nothing else.` +
     `\n<content>${stateJson()}</content>`,
-    { label: 'state', phase: 'State' }
+    // effort:'low' — verificar git y escribir un JSON es trabajo mecánico; heredar el
+    // esfuerzo de la sesión gastaba razonamiento de nivel implementación en bookkeeping.
+    { label: 'state', phase: 'State', effort: 'low' }
   ));
 }
 
@@ -105,7 +107,7 @@ function deleteState() {
     `that the run it describes has genuinely finished — no task still pending or in progress. ` +
     `If that checks out, delete .cys/state.json. If it doesn't exist, there's nothing to do. If ` +
     `you find the run hasn't actually finished, don't delete it — report why instead.`,
-    { label: 'state-clear', phase: 'Handoff' }
+    { label: 'state-clear', phase: 'Handoff', effort: 'low' }
   ));
 }
 
@@ -175,7 +177,7 @@ function appendLedgerBatch(lines) {
     `If any line describes something that didn't actually happen, don't append that one — ` +
     `report the discrepancy instead so it can be corrected; still append the rest that do ` +
     `check out.\n${linesXml}`,
-    { label: 'ledger', phase: 'Merge' }
+    { label: 'ledger', phase: 'Merge', effort: 'low' }
   ));
 }
 
