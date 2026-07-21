@@ -584,15 +584,23 @@ async function implement(task) {
     `You are implementing Task ${task.id}: "${task.title}", from the plan at ${planPath}, ` +
     `in repo ${repoPath}.\n\n` +
     `FAST-EXIT CHECK, before anything else: run \`git -C ${repoPath} show-ref --verify ` +
-    `--quiet refs/heads/task-${task.id}\` and, if the branch exists, \`git -C ${repoPath} ` +
-    `merge-base --is-ancestor task-${task.id} ${integrationBranch}\`. If BOTH succeed, this ` +
-    `task was already implemented, reviewed, and merged in a prior invocation of this same ` +
-    `run (a re-dispatch, e.g. after a resume) — do NOT re-implement, re-run tests, or ` +
-    `re-verify anything beyond those two git commands. Report immediately with ` +
-    `alreadyMerged: true, status DONE, the branch's real head SHA (\`git -C ${repoPath} ` +
-    `rev-parse task-${task.id}\`) as headSha, and a one-line commitSummary saying the work ` +
-    `was found already merged. Real pilot data: re-dispatched tasks each burned a full ` +
-    `test-suite re-verification (testcontainers included) for zero new information.\n\n` +
+    `--quiet refs/heads/task-${task.id}\`; if the branch exists, \`git -C ${repoPath} ` +
+    `merge-base --is-ancestor task-${task.id} ${integrationBranch}\`; and if that also ` +
+    `succeeds, \`git -C ${repoPath} rev-list --count ${integrationBranch}..task-${task.id}\` ` +
+    `PLUS confirm the branch actually contains this task's own commits (an EMPTY stub branch ` +
+    `pointing at the integration tip is trivially "an ancestor" — that means the branch was ` +
+    `created but the work never happened, e.g. a run cut off right after branch creation; in ` +
+    `that case delete the stub with \`git -C ${repoPath} branch -D task-${task.id}\` and ` +
+    `proceed to implement normally). Only when the branch exists, is an ancestor, AND carries ` +
+    `real commits of its own merged into ${integrationBranch} (check \`git -C ${repoPath} log ` +
+    `${integrationBranch} --oneline -20\` for this task's commits) was the task already ` +
+    `implemented, reviewed, and merged in a prior invocation (a re-dispatch, e.g. after a ` +
+    `resume) — then do NOT re-implement, re-run tests, or re-verify anything beyond these git ` +
+    `commands. Report immediately with alreadyMerged: true, status DONE, the branch's real ` +
+    `head SHA (\`git -C ${repoPath} rev-parse task-${task.id}\`) as headSha, and a one-line ` +
+    `commitSummary saying the work was found already merged. Real pilot data: re-dispatched ` +
+    `tasks each burned a full test-suite re-verification (testcontainers included) for zero ` +
+    `new information.\n\n` +
     `Other tasks run in parallel against that same repository — NEVER switch branches or ` +
     `edit files in ${repoPath} itself. Your very first repo action: create your own ` +
     `isolated worktree by running \`git -C ${repoPath} worktree add ${worktreeDir} ` +
