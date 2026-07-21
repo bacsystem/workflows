@@ -353,12 +353,26 @@ function writeState() {
     `state — for each task marked done, confirm its branch/commit SHA is a real ancestor of the ` +
     `integration branch (git log / git merge-base); for each task marked failed or in a given ` +
     `phase, check for corroborating evidence (a .cys/task-<id>-report.md, a review diff, a git ` +
-    `log entry) rather than accepting the claim at face value. If everything checks out, write ` +
-    `the content between the <content> tags to .cys/state.json (create the file/directory if ` +
-    `missing, overwrite anything already there), with "updatedAt": "<time from date>" inserted ` +
-    `as a top-level field right after "integrationBranch", and nothing else. If you find a real ` +
-    `discrepancy between the content below and the repo's actual state, do not write the file — ` +
-    `report the discrepancy instead so it can be corrected.\n<content>${stateJson()}</content>`,
+    `log entry) rather than accepting the claim at face value. This content can go stale between ` +
+    `when it was queued and when you actually run (other tasks keep progressing in the ` +
+    `meantime) — that's expected, not a red flag by itself. If you find a task whose real state ` +
+    `has moved on (e.g. its branch is now a real ancestor of the integration branch but the ` +
+    `content still marks it pending, or a report/review-diff exists showing further progress ` +
+    `than stated), don't refuse to write — correct that task's own entry yourself based on what ` +
+    `you verified: if it's merged, "status": "done" plus its real branch/commit SHA; if its ` +
+    `branch exists but isn't merged yet, "status": "in_progress" **and** a "phase" field (e.g. ` +
+    `"Implement", "Review", or "Merge", picked from what the evidence shows it has reached — a ` +
+    `bare "status" with no "phase" for a task that has actually started is itself an incomplete ` +
+    `correction). Keep the exact same JSON shape and field vocabulary the other task entries in ` +
+    `this content already use (don't invent new status values or fields). Only refuse to write ` +
+    `if something looks actually fabricated rather than merely stale — e.g. a "done" entry ` +
+    `whose branch/SHA doesn't ` +
+    `actually fabricated rather than merely stale — e.g. a "done" entry whose branch/SHA doesn't ` +
+    `exist anywhere in the repo's history at all. Write the (corrected, if needed) content ` +
+    `between the <content> tags to .cys/state.json (create the file/directory if missing, ` +
+    `overwrite anything already there), with "updatedAt": "<time from date>" inserted as a ` +
+    `top-level field right after "integrationBranch", and nothing else.` +
+    `\n<content>${stateJson()}</content>`,
     { label: 'state', phase: 'State' }
   ));
 }

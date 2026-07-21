@@ -318,14 +318,18 @@ test('built workflow tags .cys/state.json writes with their own phase, not Merge
 test('built workflow instructs the state-write agent to verify against real repo state, not just assert the content is true (safety-classifier block, pending.md bug reopened 2026-07-21)', () => {
   const writeStateIndex = output.indexOf('function writeState()');
   assert.ok(writeStateIndex >= 0, 'debe existir writeState()');
-  const writeStateBody = output.slice(writeStateIndex, writeStateIndex + 1600);
+  const writeStateBody = output.slice(writeStateIndex, writeStateIndex + 2600);
   assert.ok(
     writeStateBody.includes('independently verify') && writeStateBody.includes('git log') && writeStateBody.includes('git merge-base'),
     'la primera corrección (afirmarle al agente "esto ya es verdad, escríbelo") seguía siendo bloqueada por el clasificador en corridas reales — el prompt debe pedirle al agente que verifique el contenido contra el repo real antes de escribir, no solo confiar en la afirmación'
   );
   assert.ok(
-    writeStateBody.includes('do not write the file') || writeStateBody.includes("don't write the file"),
-    'el agente debe tener una salida explícita para cuando la verificación falla, en vez de escribir igual'
+    writeStateBody.includes("don't refuse to write") && writeStateBody.includes('correct that task'),
+    'una foto desactualizada por la cola de encolado es esperable, no un bloqueo — el agente debe autocorregir la entrada de la tarea con lo que verificó, no negarse a escribir sin más (el primer intento de este arreglo solo pedía "no escribas, reportá", lo que dejaba state.json congelado indefinidamente)'
+  );
+  assert.ok(
+    writeStateBody.includes('"status": "in_progress"') && writeStateBody.includes('"phase"'),
+    'la corrección debe incluir tanto status como phase para una tarea en curso — un status sin phase es una corrección incompleta (pedido explícito del usuario tras ver state.json sin fase)'
   );
 });
 
@@ -342,7 +346,7 @@ test('built workflow instructs the ledger-append agent to spot-check the line ag
 test('built workflow adds updatedAt to .cys/state.json via the write agent\'s own date command (pending.md gap, Fase 4b design)', () => {
   const writeStateIndex = output.indexOf('function writeState()');
   assert.ok(writeStateIndex >= 0, 'debe existir writeState()');
-  const writeStateBody = output.slice(writeStateIndex, writeStateIndex + 1400);
+  const writeStateBody = output.slice(writeStateIndex, writeStateIndex + 2600);
   assert.ok(
     writeStateBody.includes('date +%H:%M:%S'),
     'el timestamp no puede venir de Date.now()/new Date() (prohibido en el sandbox de Workflow) — debe pedirle al agente que corra date'
