@@ -460,24 +460,45 @@ const HANDOFF_SCHEMA = {
   required: ['handoffFile'],
 };
 
-function appendLedger(line) {
+function appendLedgerBatch(lines) {
   // Pasa por la misma cola que fixes y merges: dos tareas fallando a la vez hacían
-  // append concurrente sobre el mismo archivo del repo principal. El contenido va entre
+  // append concurrente sobre el mismo archivo del repo principal. Cada línea va entre
   // <line></line> porque incluye texto libre de otros agentes (concerns, findings) —
   // una comilla en ese texto rompía el framing del prompt.
+  const linesXml = lines.map((l) => `<line>${l}</line>`).join('\n');
   return enqueueMainRepo(() => agent(
-    `In repo ${repoPath}, you are appending one line to .cys/progress.md, a human-readable ` +
-    `log of this parallel-plan-executor run. The proposed line is between the <line> tags ` +
-    `below, written by an earlier step in this same run. Before appending it, spot-check its ` +
-    `factual claims against real evidence you can inspect yourself — a referenced commit SHA ` +
-    `should exist in \`git log\`, a referenced merge/conflict should be visible in the repo's ` +
-    `actual state or a .cys/task-<id>-report.md, a referenced review verdict should match a ` +
-    `real review diff. If it checks out, append it verbatim (create the file/directory if ` +
-    `missing), without the tags. If you find it describes something that didn't actually ` +
-    `happen, don't append it — report the discrepancy instead so the line can be corrected.` +
-    `\n<line>${line}</line>`,
+    `In repo ${repoPath}, you are appending ${lines.length} line(s) to .cys/progress.md, a ` +
+    `human-readable log of this parallel-plan-executor run. The proposed lines are the ` +
+    `<line> tags below, each written by an earlier step in this same run. Before appending ` +
+    `each one, spot-check its factual claims against real evidence you can inspect yourself — ` +
+    `a referenced commit SHA should exist in \`git log\`, a referenced merge/conflict should ` +
+    `be visible in the repo's actual state or a .cys/task-<id>-report.md, a referenced review ` +
+    `verdict should match a real review diff. Append the ones that check out verbatim, one ` +
+    `per line, in the given order (create the file/directory if missing), without the tags. ` +
+    `If any line describes something that didn't actually happen, don't append that one — ` +
+    `report the discrepancy instead so it can be corrected; still append the rest that do ` +
+    `check out.\n${linesXml}`,
     { label: 'ledger', phase: 'Merge' }
   ));
+}
+
+// Coalesces concurrent appendLedger() calls the same way requestWriteState()
+// coalesces state writes: if a batch is already in flight, new lines just
+// join the next batch instead of each spawning its own [ledger] agent.
+let ledgerChain = null;
+let ledgerPending = [];
+function appendLedger(line) {
+  ledgerPending.push(line);
+  if (ledgerChain) return ledgerChain;
+  ledgerChain = (async () => {
+    while (ledgerPending.length > 0) {
+      const batch = ledgerPending;
+      ledgerPending = [];
+      await appendLedgerBatch(batch);
+    }
+    ledgerChain = null;
+  })();
+  return ledgerChain;
 }
 
 // Serializa TODA operación que toca el working tree de repoPath: los merges (checkout de

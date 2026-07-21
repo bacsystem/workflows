@@ -131,8 +131,9 @@ test('built workflow serializes every main-repo working-tree operation through o
 
 test('built workflow frames ledger content so free-form agent text cannot break the prompt', () => {
   assert.ok(
-    output.includes('<line>${line}</line>'),
-    'la línea del ledger debe ir delimitada, no incrustada entre comillas'
+    output.includes('<line>${l}</line>') || output.includes('<line>${line}</line>'),
+    'cada línea del ledger debe ir delimitada con <line></line>, no incrustada entre comillas — ' +
+    'sigue siendo cierto tras el coalescing de appendLedger(), que arma el XML por línea vía .map()'
   );
 });
 
@@ -334,12 +335,26 @@ test('built workflow instructs the state-write agent to verify against real repo
 });
 
 test('built workflow instructs the ledger-append agent to spot-check the line against real evidence before appending (safety-classifier block, pending.md bug reopened 2026-07-21)', () => {
-  const appendLedgerIndex = output.indexOf('function appendLedger(');
-  assert.ok(appendLedgerIndex >= 0, 'debe existir appendLedger()');
-  const appendLedgerBody = output.slice(appendLedgerIndex, appendLedgerIndex + 1200);
+  const appendLedgerBatchIndex = output.indexOf('function appendLedgerBatch(');
+  assert.ok(appendLedgerBatchIndex >= 0, 'debe existir appendLedgerBatch()');
+  const appendLedgerBatchBody = output.slice(appendLedgerBatchIndex, appendLedgerBatchIndex + 1200);
   assert.ok(
-    appendLedgerBody.includes('spot-check') && appendLedgerBody.includes('git log'),
+    appendLedgerBatchBody.includes('spot-check') && appendLedgerBatchBody.includes('git log'),
     'el agente de ledger debe verificar las afirmaciones de la línea contra evidencia real (git log, reportes) antes de agregarla, no solo confiar en el texto que le pasaron'
+  );
+});
+
+test('built workflow coalesces concurrent appendLedger() calls into one batched [ledger] agent', () => {
+  const appendLedgerIndex = output.indexOf('function appendLedger(line)');
+  assert.ok(appendLedgerIndex >= 0, 'debe existir appendLedger(line), el wrapper público de coalescing');
+  const appendLedgerBody = output.slice(appendLedgerIndex, appendLedgerIndex + 500);
+  assert.ok(
+    appendLedgerBody.includes('ledgerPending') && appendLedgerBody.includes('while'),
+    'appendLedger() debe encolar en ledgerPending y reintentar con un loop mientras haya líneas nuevas, no lanzar un agente por cada llamada'
+  );
+  assert.ok(
+    output.includes('appendLedgerBatch(batch)'),
+    'el batch acumulado debe pasarse completo a appendLedgerBatch(), no una línea a la vez'
   );
 });
 
