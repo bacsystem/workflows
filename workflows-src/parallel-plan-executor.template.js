@@ -39,23 +39,29 @@ function stateJson() {
 
 function writeState() {
   return enqueueMainRepo(() => agent(
-    `Run \`date +%H:%M:%S\` first to get the current time. In repo ${repoPath}, write to ` +
-    `.cys/state.json (create the file and its directory if missing, overwriting anything ` +
-    `already there) the content between the <content> tags below, but with ` +
-    `"updatedAt": "<time from date>" inserted as a top-level field right after ` +
-    `"integrationBranch". This is the Workflow's own bookkeeping snapshot, not new work — ` +
-    `every status/SHA in it reflects tasks already completed and verified earlier in this same run ` +
-    `(real merges, real commit SHAs, real review verdicts), kept as a durable record so a ` +
-    `future session can detect and resume an interrupted run. Write nothing else, no ` +
-    `commentary:\n<content>${stateJson()}</content>`,
+    `Run \`date +%H:%M:%S\` first to get the current time. In repo ${repoPath}, you are ` +
+    `updating .cys/state.json, a resume-bookkeeping snapshot for a parallel-plan-executor run. ` +
+    `Before writing anything: independently verify the content below against the repo's actual ` +
+    `state — for each task marked done, confirm its branch/commit SHA is a real ancestor of the ` +
+    `integration branch (git log / git merge-base); for each task marked failed or in a given ` +
+    `phase, check for corroborating evidence (a .cys/task-<id>-report.md, a review diff, a git ` +
+    `log entry) rather than accepting the claim at face value. If everything checks out, write ` +
+    `the content between the <content> tags to .cys/state.json (create the file/directory if ` +
+    `missing, overwrite anything already there), with "updatedAt": "<time from date>" inserted ` +
+    `as a top-level field right after "integrationBranch", and nothing else. If you find a real ` +
+    `discrepancy between the content below and the repo's actual state, do not write the file — ` +
+    `report the discrepancy instead so it can be corrected.\n<content>${stateJson()}</content>`,
     { label: 'state', phase: 'State' }
   ));
 }
 
 function deleteState() {
   return enqueueMainRepo(() => agent(
-    `In repo ${repoPath}, delete .cys/state.json if it exists (the run finished naturally; ` +
-    `no incomplete state to report). It's fine if it doesn't exist already.`,
+    `In repo ${repoPath}, check whether .cys/state.json exists. If it does, verify against the ` +
+    `repo's actual state (git log on the integration branch, .cys/task-<id>-report.md files) ` +
+    `that the run it describes has genuinely finished — no task still pending or in progress. ` +
+    `If that checks out, delete .cys/state.json. If it doesn't exist, there's nothing to do. If ` +
+    `you find the run hasn't actually finished, don't delete it — report why instead.`,
     { label: 'state-clear', phase: 'Handoff' }
   ));
 }
@@ -114,9 +120,16 @@ function appendLedger(line) {
   // <line></line> porque incluye texto libre de otros agentes (concerns, findings) —
   // una comilla en ese texto rompía el framing del prompt.
   return enqueueMainRepo(() => agent(
-    `In repo ${repoPath}, append to .cys/progress.md (create the file and ` +
-    `its directory if missing) exactly the single line between the <line> tags below, ` +
-    `without the tags:\n<line>${line}</line>`,
+    `In repo ${repoPath}, you are appending one line to .cys/progress.md, a human-readable ` +
+    `log of this parallel-plan-executor run. The proposed line is between the <line> tags ` +
+    `below, written by an earlier step in this same run. Before appending it, spot-check its ` +
+    `factual claims against real evidence you can inspect yourself — a referenced commit SHA ` +
+    `should exist in \`git log\`, a referenced merge/conflict should be visible in the repo's ` +
+    `actual state or a .cys/task-<id>-report.md, a referenced review verdict should match a ` +
+    `real review diff. If it checks out, append it verbatim (create the file/directory if ` +
+    `missing), without the tags. If you find it describes something that didn't actually ` +
+    `happen, don't append it — report the discrepancy instead so the line can be corrected.` +
+    `\n<line>${line}</line>`,
     { label: 'ledger', phase: 'Merge' }
   ));
 }

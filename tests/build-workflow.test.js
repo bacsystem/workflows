@@ -315,10 +315,27 @@ test('built workflow tags .cys/state.json writes with their own phase, not Merge
   );
 });
 
-test('built workflow frames the state-write prompt as verified bookkeeping, not new claims (safety-classifier block, pending.md bug)', () => {
+test('built workflow instructs the state-write agent to verify against real repo state, not just assert the content is true (safety-classifier block, pending.md bug reopened 2026-07-21)', () => {
+  const writeStateIndex = output.indexOf('function writeState()');
+  assert.ok(writeStateIndex >= 0, 'debe existir writeState()');
+  const writeStateBody = output.slice(writeStateIndex, writeStateIndex + 1600);
   assert.ok(
-    output.includes('bookkeeping snapshot') && output.includes('already completed and verified earlier in this same run'),
-    'sin este framing, el clasificador de seguridad puede leer un JSON con status "done" y SHAs reales como una fabricación en vez de un registro legítimo de resultados ya verificados'
+    writeStateBody.includes('independently verify') && writeStateBody.includes('git log') && writeStateBody.includes('git merge-base'),
+    'la primera corrección (afirmarle al agente "esto ya es verdad, escríbelo") seguía siendo bloqueada por el clasificador en corridas reales — el prompt debe pedirle al agente que verifique el contenido contra el repo real antes de escribir, no solo confiar en la afirmación'
+  );
+  assert.ok(
+    writeStateBody.includes('do not write the file') || writeStateBody.includes("don't write the file"),
+    'el agente debe tener una salida explícita para cuando la verificación falla, en vez de escribir igual'
+  );
+});
+
+test('built workflow instructs the ledger-append agent to spot-check the line against real evidence before appending (safety-classifier block, pending.md bug reopened 2026-07-21)', () => {
+  const appendLedgerIndex = output.indexOf('function appendLedger(');
+  assert.ok(appendLedgerIndex >= 0, 'debe existir appendLedger()');
+  const appendLedgerBody = output.slice(appendLedgerIndex, appendLedgerIndex + 1200);
+  assert.ok(
+    appendLedgerBody.includes('spot-check') && appendLedgerBody.includes('git log'),
+    'el agente de ledger debe verificar las afirmaciones de la línea contra evidencia real (git log, reportes) antes de agregarla, no solo confiar en el texto que le pasaron'
   );
 });
 
