@@ -356,6 +356,10 @@ test('built workflow coalesces concurrent appendLedger() calls into one batched 
     output.includes('appendLedgerBatch(batch)'),
     'el batch acumulado debe pasarse completo a appendLedgerBatch(), no una línea a la vez'
   );
+  assert.ok(
+    output.includes('agrupó') && output.includes('batch.length'),
+    'debe loguear cuántas líneas se agruparon en un solo agente, para que se pueda confirmar en vivo que el coalescing está funcionando (pedido explícito del usuario)'
+  );
 });
 
 test('built workflow coalesces concurrent state-write requests instead of dispatching one [state] agent per settle()/markInProgress() call', () => {
@@ -369,6 +373,10 @@ test('built workflow coalesces concurrent state-write requests instead of dispat
   assert.ok(
     output.includes('await requestWriteState()') && output.includes('return requestWriteState()'),
     'settle() y markInProgress() deben pasar por requestWriteState(), no llamar a writeState() directo (si no, el coalescing no tiene efecto)'
+  );
+  assert.ok(
+    output.includes('agrupó') && output.includes('stateWriteRequests'),
+    'debe loguear cuántos pedidos de escritura se agruparon en un solo agente, para que se pueda confirmar en vivo que el coalescing está funcionando (pedido explícito del usuario)'
   );
 });
 

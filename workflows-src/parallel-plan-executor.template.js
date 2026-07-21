@@ -80,12 +80,17 @@ function writeState() {
 // count of actual [state] agents drops with how much settling clusters.
 let stateWriteChain = null;
 let stateWriteDirty = false;
+let stateWriteRequests = 0;
 function requestWriteState() {
   stateWriteDirty = true;
+  stateWriteRequests += 1;
   if (stateWriteChain) return stateWriteChain;
   stateWriteChain = (async () => {
     while (stateWriteDirty) {
       stateWriteDirty = false;
+      const batched = stateWriteRequests;
+      stateWriteRequests = 0;
+      if (batched > 1) log(`[state] agrupó ${batched} pedidos de escritura en 1 solo agente`);
       await writeState();
     }
     stateWriteChain = null;
@@ -186,6 +191,7 @@ function appendLedger(line) {
     while (ledgerPending.length > 0) {
       const batch = ledgerPending;
       ledgerPending = [];
+      if (batch.length > 1) log(`[ledger] agrupó ${batch.length} líneas en 1 solo agente`);
       await appendLedgerBatch(batch);
     }
     ledgerChain = null;
