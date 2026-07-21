@@ -12,7 +12,7 @@ if (!repoPath || !baseSha || !headSha || !outDir) {
 // execFile (sin shell) con -C: los SHAs y rutas llegan de otros agentes — nada se
 // interpola en una línea de shell.
 function git(...args) {
-  return execFileSync('git', ['-C', repoPath, ...args], { encoding: 'utf8' });
+  return execFileSync('git', ['-C', repoPath, ...args], { encoding: 'utf8', maxBuffer: 1024 * 1024 * 1024 });
 }
 
 let commits, stat, diff;
