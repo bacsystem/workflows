@@ -93,6 +93,24 @@ Each step is one 2-5 minute action, with complete content — never
   An empty warnings array is not proof the graph is right, only that the
   parser didn't flag anything; a plan-authoring mistake can still produce
   a graph that's silently wrong.
+- **Caller-cardinality check:** for any function whose sample code you
+  write once and other tasks' sample code then calls, find every one of
+  those call sites and check the multiplicity they actually feed it — not
+  just the single trivial case your own task's test happens to cover. A
+  `bs-inventory` pilot (2026-07-20) shipped a compliance ledger function
+  with a single shared running-balance accumulator, tested with one
+  product at one warehouse; two *other* tasks' sample code fed it a whole
+  tenant's movements across many products/warehouses, silently mixing
+  unrelated balances — invisible until a reviewer traced the real callers,
+  not caught by the function's own task's test.
+- **Spec-field literalness check:** for any sample code that maps a
+  specific field to a specific spec-mandated value (compliance/legal
+  fields especially), re-read that exact line of the design spec at
+  write time and grep for it — don't write the field from memory of the
+  general idea. Same pilot: the design spec said field 4 must be
+  `Warehouse.rucEstablishmentCode`; the plan's sample code used the
+  warehouse's internal ID instead, because it was written from a general
+  sense of "the warehouse" rather than the spec's literal mapping.
 - **Exhaustive-coverage claims:** if the spec states a test suite "covers
   every case in this table" (or similar), the plan's test steps must
   enumerate each row as its own explicit test step — a summary claim

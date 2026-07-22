@@ -39,24 +39,75 @@ function stateJson() {
 
 function writeState() {
   return enqueueMainRepo(() => agent(
-    `Run \`date +%H:%M:%S\` first to get the current time. In repo ${repoPath}, write to ` +
-    `.cys/state.json (create the file and its directory if missing, overwriting anything ` +
-    `already there) the content between the <content> tags below, but with ` +
-    `"updatedAt": "<time from date>" inserted as a top-level field right after ` +
-    `"integrationBranch". This is the Workflow's own bookkeeping snapshot, not new work — ` +
-    `every status/SHA in it reflects tasks already completed and verified earlier in this same run ` +
-    `(real merges, real commit SHAs, real review verdicts), kept as a durable record so a ` +
-    `future session can detect and resume an interrupted run. Write nothing else, no ` +
-    `commentary:\n<content>${stateJson()}</content>`,
-    { label: 'state', phase: 'State' }
+    `Run \`date +%H:%M:%S\` first to get the current time. In repo ${repoPath}, you are ` +
+    `updating .cys/state.json, a resume-bookkeeping snapshot for a parallel-plan-executor run. ` +
+    `Before writing anything: independently verify the content below against the repo's actual ` +
+    `state — for each task marked done, confirm its branch/commit SHA is a real ancestor of the ` +
+    `integration branch (git log / git merge-base); for each task marked failed or in a given ` +
+    `phase, check for corroborating evidence (a .cys/task-<id>-report.md, a review diff, a git ` +
+    `log entry) rather than accepting the claim at face value. This content can go stale between ` +
+    `when it was queued and when you actually run (other tasks keep progressing in the ` +
+    `meantime) — that's expected, not a red flag by itself. If you find a task whose real state ` +
+    `has moved on (e.g. its branch is now a real ancestor of the integration branch but the ` +
+    `content still marks it pending, or a report/review-diff exists showing further progress ` +
+    `than stated), don't refuse to write — correct that task's own entry yourself based on what ` +
+    `you verified: if it's merged, "status": "done" plus its real branch/commit SHA; if its ` +
+    `branch exists but isn't merged yet, "status": "in_progress" **and** a "phase" field (e.g. ` +
+    `"Implement", "Review", or "Merge", picked from what the evidence shows it has reached — a ` +
+    `bare "status" with no "phase" for a task that has actually started is itself an incomplete ` +
+    `correction). Keep the exact same JSON shape and field vocabulary the other task entries in ` +
+    `this content already use (don't invent new status values or fields). Only refuse to write ` +
+    `if something looks actually fabricated rather than merely stale — e.g. a "done" entry ` +
+    `whose branch/SHA doesn't exist anywhere in the repo's history at all. Write the ` +
+    `(corrected, if needed) content ` +
+    `between the <content> tags to .cys/state.json (create the file/directory if missing, ` +
+    `overwrite anything already there), with "updatedAt": "<time from date>" inserted as a ` +
+    `top-level field right after "integrationBranch", and nothing else.` +
+    `\n<content>${stateJson()}</content>`,
+    // effort:'low' — verificar git y escribir un JSON es trabajo mecánico; heredar el
+    // esfuerzo de la sesión gastaba razonamiento de nivel implementación en bookkeeping.
+    { label: 'state', phase: 'State', effort: 'low' }
   ));
+}
+
+// Coalesces concurrent state-write requests into one dispatched agent per
+// "wave" instead of one per settle()/markInProgress() call: several tasks
+// settling close together (a common real pattern — e.g. every dependency-
+// free task starting around the same time) used to fire one [state] agent
+// each. If a write is already in flight when a new request comes in, this
+// just flags "there's more to record" and lets the in-flight write's own
+// follow-up pass (which reads taskStates — and so stateJson() — fresh at
+// that later point) pick it up, rather than spawning another agent. Still
+// writes at least once per wave, so crash-resume safety is unchanged; the
+// count of actual [state] agents drops with how much settling clusters.
+let stateWriteChain = null;
+let stateWriteDirty = false;
+let stateWriteRequests = 0;
+function requestWriteState() {
+  stateWriteDirty = true;
+  stateWriteRequests += 1;
+  if (stateWriteChain) return stateWriteChain;
+  stateWriteChain = (async () => {
+    while (stateWriteDirty) {
+      stateWriteDirty = false;
+      const batched = stateWriteRequests;
+      stateWriteRequests = 0;
+      if (batched > 1) log(`[state] agrupó ${batched} pedidos de escritura en 1 solo agente`);
+      await writeState();
+    }
+    stateWriteChain = null;
+  })();
+  return stateWriteChain;
 }
 
 function deleteState() {
   return enqueueMainRepo(() => agent(
-    `In repo ${repoPath}, delete .cys/state.json if it exists (the run finished naturally; ` +
-    `no incomplete state to report). It's fine if it doesn't exist already.`,
-    { label: 'state-clear', phase: 'Handoff' }
+    `In repo ${repoPath}, check whether .cys/state.json exists. If it does, verify against the ` +
+    `repo's actual state (git log on the integration branch, .cys/task-<id>-report.md files) ` +
+    `that the run it describes has genuinely finished — no task still pending or in progress. ` +
+    `If that checks out, delete .cys/state.json. If it doesn't exist, there's nothing to do. If ` +
+    `you find the run hasn't actually finished, don't delete it — report why instead.`,
+    { label: 'state-clear', phase: 'Handoff', effort: 'low' }
   ));
 }
 
@@ -73,6 +124,7 @@ const IMPLEMENTER_SCHEMA = {
     concerns: { type: 'string' },
     startedAt: { type: 'string', description: 'HH:MM:SS wall-clock time when work began (from `date +%H:%M:%S`)' },
     finishedAt: { type: 'string', description: 'HH:MM:SS wall-clock time right before reporting' },
+    alreadyMerged: { type: 'boolean', description: 'true ONLY when the task branch already existed AND was already an ancestor of the integration branch before this agent did anything — i.e. a re-dispatch of finished work' },
   },
   required: ['status', 'branch', 'baseSha', 'headSha', 'reportFile', 'startedAt', 'finishedAt'],
 };
@@ -108,17 +160,46 @@ const HANDOFF_SCHEMA = {
   required: ['handoffFile'],
 };
 
-function appendLedger(line) {
+function appendLedgerBatch(lines) {
   // Pasa por la misma cola que fixes y merges: dos tareas fallando a la vez hacían
-  // append concurrente sobre el mismo archivo del repo principal. El contenido va entre
+  // append concurrente sobre el mismo archivo del repo principal. Cada línea va entre
   // <line></line> porque incluye texto libre de otros agentes (concerns, findings) —
   // una comilla en ese texto rompía el framing del prompt.
+  const linesXml = lines.map((l) => `<line>${l}</line>`).join('\n');
   return enqueueMainRepo(() => agent(
-    `In repo ${repoPath}, append to .cys/progress.md (create the file and ` +
-    `its directory if missing) exactly the single line between the <line> tags below, ` +
-    `without the tags:\n<line>${line}</line>`,
-    { label: 'ledger', phase: 'Merge' }
+    `In repo ${repoPath}, you are appending ${lines.length} line(s) to .cys/progress.md, a ` +
+    `human-readable log of this parallel-plan-executor run. The proposed lines are the ` +
+    `<line> tags below, each written by an earlier step in this same run. Before appending ` +
+    `each one, spot-check its factual claims against real evidence you can inspect yourself — ` +
+    `a referenced commit SHA should exist in \`git log\`, a referenced merge/conflict should ` +
+    `be visible in the repo's actual state or a .cys/task-<id>-report.md, a referenced review ` +
+    `verdict should match a real review diff. Append the ones that check out verbatim, one ` +
+    `per line, in the given order (create the file/directory if missing), without the tags. ` +
+    `If any line describes something that didn't actually happen, don't append that one — ` +
+    `report the discrepancy instead so it can be corrected; still append the rest that do ` +
+    `check out.\n${linesXml}`,
+    { label: 'ledger', phase: 'Merge', effort: 'low' }
   ));
+}
+
+// Coalesces concurrent appendLedger() calls the same way requestWriteState()
+// coalesces state writes: if a batch is already in flight, new lines just
+// join the next batch instead of each spawning its own [ledger] agent.
+let ledgerChain = null;
+let ledgerPending = [];
+function appendLedger(line) {
+  ledgerPending.push(line);
+  if (ledgerChain) return ledgerChain;
+  ledgerChain = (async () => {
+    while (ledgerPending.length > 0) {
+      const batch = ledgerPending;
+      ledgerPending = [];
+      if (batch.length > 1) log(`[ledger] agrupó ${batch.length} líneas en 1 solo agente`);
+      await appendLedgerBatch(batch);
+    }
+    ledgerChain = null;
+  })();
+  return ledgerChain;
 }
 
 // Serializa TODA operación que toca el working tree de repoPath: los merges (checkout de
@@ -154,7 +235,7 @@ async function settle(taskId, status, label, extra = {}) {
   settledCount += 1;
   taskStates.set(taskId, { status, ...extra });
   log(`${progressBar()} — Task ${taskId} (branch task-${taskId}) ${label}`);
-  await writeState();
+  await requestWriteState();
 }
 
 // Sin esto, .cys/state.json muestra 'pending' desde que arranca la corrida hasta que la
@@ -164,7 +245,7 @@ async function settle(taskId, status, label, extra = {}) {
 // leyendo state.json durante una corrida en curso.
 function markInProgress(taskId, phase) {
   taskStates.set(taskId, { status: 'in_progress', phase });
-  return writeState();
+  return requestWriteState();
 }
 
 // agent() devuelve null si el usuario saltea el agente o si murió por un error terminal
@@ -194,6 +275,24 @@ async function implement(task) {
   return agent(
     `You are implementing Task ${task.id}: "${task.title}", from the plan at ${planPath}, ` +
     `in repo ${repoPath}.\n\n` +
+    `FAST-EXIT CHECK, before anything else: run \`git -C ${repoPath} show-ref --verify ` +
+    `--quiet refs/heads/task-${task.id}\`; if the branch exists, \`git -C ${repoPath} ` +
+    `merge-base --is-ancestor task-${task.id} ${integrationBranch}\`; and if that also ` +
+    `succeeds, \`git -C ${repoPath} rev-list --count ${integrationBranch}..task-${task.id}\` ` +
+    `PLUS confirm the branch actually contains this task's own commits (an EMPTY stub branch ` +
+    `pointing at the integration tip is trivially "an ancestor" — that means the branch was ` +
+    `created but the work never happened, e.g. a run cut off right after branch creation; in ` +
+    `that case delete the stub with \`git -C ${repoPath} branch -D task-${task.id}\` and ` +
+    `proceed to implement normally). Only when the branch exists, is an ancestor, AND carries ` +
+    `real commits of its own merged into ${integrationBranch} (check \`git -C ${repoPath} log ` +
+    `${integrationBranch} --oneline -20\` for this task's commits) was the task already ` +
+    `implemented, reviewed, and merged in a prior invocation (a re-dispatch, e.g. after a ` +
+    `resume) — then do NOT re-implement, re-run tests, or re-verify anything beyond these git ` +
+    `commands. Report immediately with alreadyMerged: true, status DONE, the branch's real ` +
+    `head SHA (\`git -C ${repoPath} rev-parse task-${task.id}\`) as headSha, and a one-line ` +
+    `commitSummary saying the work was found already merged. Real pilot data: re-dispatched ` +
+    `tasks each burned a full test-suite re-verification (testcontainers included) for zero ` +
+    `new information.\n\n` +
     `Other tasks run in parallel against that same repository — NEVER switch branches or ` +
     `edit files in ${repoPath} itself. Your very first repo action: create your own ` +
     `isolated worktree by running \`git -C ${repoPath} worktree add ${worktreeDir} ` +
@@ -324,6 +423,20 @@ async function executeTask(taskId) {
   log(`Task ${taskId}: started (implement) on branch task-${taskId}`);
   let impl = ensureAgentResult(taskId, await implement(task), 'implementer');
   await assertNotBlocked(taskId, impl);
+
+  // Salida rápida (piloto bs-inventory 2026-07-21): una tarea re-despachada tras un
+  // resume (el caché invalida por prefijo, así que pasa seguido) volvía a pagar
+  // revisión + merge completos sobre trabajo ya integrado — 63 agentes de review y
+  // 57 de merge para 10 tareas. Si el implementador confirmó vía git que la rama ya
+  // es ancestro de la rama de integración, no hay nada nuevo que revisar ni mergear.
+  if (impl.alreadyMerged) {
+    log(`Task ${taskId}: already merged in a prior invocation — skipping review and merge`);
+    await settle(taskId, 'done', 'already merged (re-dispatch fast-exit)', {
+      branch: `task-${taskId}`,
+      headSha: impl.headSha,
+    });
+    return impl;
+  }
 
   await markInProgress(taskId, 'Review');
   let verdict = ensureAgentResult(taskId, await review(task, impl), 'reviewer');

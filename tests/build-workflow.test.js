@@ -131,8 +131,9 @@ test('built workflow serializes every main-repo working-tree operation through o
 
 test('built workflow frames ledger content so free-form agent text cannot break the prompt', () => {
   assert.ok(
-    output.includes('<line>${line}</line>'),
-    'la línea del ledger debe ir delimitada, no incrustada entre comillas'
+    output.includes('<line>${l}</line>') || output.includes('<line>${line}</line>'),
+    'cada línea del ledger debe ir delimitada con <line></line>, no incrustada entre comillas — ' +
+    'sigue siendo cierto tras el coalescing de appendLedger(), que arma el XML por línea vía .map()'
   );
 });
 
@@ -315,17 +316,89 @@ test('built workflow tags .cys/state.json writes with their own phase, not Merge
   );
 });
 
-test('built workflow frames the state-write prompt as verified bookkeeping, not new claims (safety-classifier block, pending.md bug)', () => {
+test('built workflow instructs the state-write agent to verify against real repo state, not just assert the content is true (safety-classifier block, pending.md bug reopened 2026-07-21)', () => {
+  const writeStateIndex = output.indexOf('function writeState()');
+  assert.ok(writeStateIndex >= 0, 'debe existir writeState()');
+  const writeStateBody = output.slice(writeStateIndex, writeStateIndex + 2600);
   assert.ok(
-    output.includes('bookkeeping snapshot') && output.includes('already completed and verified earlier in this same run'),
-    'sin este framing, el clasificador de seguridad puede leer un JSON con status "done" y SHAs reales como una fabricación en vez de un registro legítimo de resultados ya verificados'
+    writeStateBody.includes('independently verify') && writeStateBody.includes('git log') && writeStateBody.includes('git merge-base'),
+    'la primera corrección (afirmarle al agente "esto ya es verdad, escríbelo") seguía siendo bloqueada por el clasificador en corridas reales — el prompt debe pedirle al agente que verifique el contenido contra el repo real antes de escribir, no solo confiar en la afirmación'
+  );
+  assert.ok(
+    writeStateBody.includes("don't refuse to write") && writeStateBody.includes('correct that task'),
+    'una foto desactualizada por la cola de encolado es esperable, no un bloqueo — el agente debe autocorregir la entrada de la tarea con lo que verificó, no negarse a escribir sin más (el primer intento de este arreglo solo pedía "no escribas, reportá", lo que dejaba state.json congelado indefinidamente)'
+  );
+  assert.ok(
+    writeStateBody.includes('"status": "in_progress"') && writeStateBody.includes('"phase"'),
+    'la corrección debe incluir tanto status como phase para una tarea en curso — un status sin phase es una corrección incompleta (pedido explícito del usuario tras ver state.json sin fase)'
+  );
+});
+
+test('built workflow instructs the ledger-append agent to spot-check the line against real evidence before appending (safety-classifier block, pending.md bug reopened 2026-07-21)', () => {
+  const appendLedgerBatchIndex = output.indexOf('function appendLedgerBatch(');
+  assert.ok(appendLedgerBatchIndex >= 0, 'debe existir appendLedgerBatch()');
+  const appendLedgerBatchBody = output.slice(appendLedgerBatchIndex, appendLedgerBatchIndex + 1200);
+  assert.ok(
+    appendLedgerBatchBody.includes('spot-check') && appendLedgerBatchBody.includes('git log'),
+    'el agente de ledger debe verificar las afirmaciones de la línea contra evidencia real (git log, reportes) antes de agregarla, no solo confiar en el texto que le pasaron'
+  );
+});
+
+test('built workflow coalesces concurrent appendLedger() calls into one batched [ledger] agent', () => {
+  const appendLedgerIndex = output.indexOf('function appendLedger(line)');
+  assert.ok(appendLedgerIndex >= 0, 'debe existir appendLedger(line), el wrapper público de coalescing');
+  const appendLedgerBody = output.slice(appendLedgerIndex, appendLedgerIndex + 500);
+  assert.ok(
+    appendLedgerBody.includes('ledgerPending') && appendLedgerBody.includes('while'),
+    'appendLedger() debe encolar en ledgerPending y reintentar con un loop mientras haya líneas nuevas, no lanzar un agente por cada llamada'
+  );
+  assert.ok(
+    output.includes('appendLedgerBatch(batch)'),
+    'el batch acumulado debe pasarse completo a appendLedgerBatch(), no una línea a la vez'
+  );
+  assert.ok(
+    output.includes('agrupó') && output.includes('batch.length'),
+    'debe loguear cuántas líneas se agruparon en un solo agente, para que se pueda confirmar en vivo que el coalescing está funcionando (pedido explícito del usuario)'
+  );
+});
+
+test('built workflow coalesces concurrent state-write requests instead of dispatching one [state] agent per settle()/markInProgress() call', () => {
+  const requestIndex = output.indexOf('function requestWriteState()');
+  assert.ok(requestIndex >= 0, 'debe existir requestWriteState(), el wrapper de coalescing sobre writeState()');
+  const requestBody = output.slice(requestIndex, requestIndex + 500);
+  assert.ok(
+    requestBody.includes('stateWriteDirty') && requestBody.includes('while'),
+    'el coalescing debe usar una bandera "dirty" y un loop que reintente mientras haya pedidos nuevos, no lanzar un agente por cada llamada'
+  );
+  assert.ok(
+    output.includes('await requestWriteState()') && output.includes('return requestWriteState()'),
+    'settle() y markInProgress() deben pasar por requestWriteState(), no llamar a writeState() directo (si no, el coalescing no tiene efecto)'
+  );
+  assert.ok(
+    output.includes('agrupó') && output.includes('stateWriteRequests'),
+    'debe loguear cuántos pedidos de escritura se agruparon en un solo agente, para que se pueda confirmar en vivo que el coalescing está funcionando (pedido explícito del usuario)'
+  );
+});
+
+test('built workflow fast-exits re-dispatched already-merged tasks without re-review or re-merge (pilot bs-inventory 2026-07-21)', () => {
+  assert.ok(
+    output.includes('FAST-EXIT CHECK') && output.includes('alreadyMerged: true'),
+    'el prompt del implementador debe chequear primero (branch existe + es ancestro de la rama de integración) y reportar alreadyMerged sin re-correr tests — cada re-despacho pagaba una re-verificación completa con testcontainers'
+  );
+  assert.ok(
+    output.includes('if (impl.alreadyMerged)') && output.includes('skipping review and merge'),
+    'runTask debe cortocircuitar a settle(done) cuando el implementador confirma alreadyMerged — sin esto, cada re-despacho pagaba revisión + merge completos sobre trabajo ya integrado (63 reviews / 57 merges para 10 tareas en el piloto)'
+  );
+  assert.ok(
+    output.indexOf('if (impl.alreadyMerged)') < output.indexOf("await markInProgress(taskId, 'Review')"),
+    'el cortocircuito debe evaluarse ANTES de entrar a la fase de Review'
   );
 });
 
 test('built workflow adds updatedAt to .cys/state.json via the write agent\'s own date command (pending.md gap, Fase 4b design)', () => {
   const writeStateIndex = output.indexOf('function writeState()');
   assert.ok(writeStateIndex >= 0, 'debe existir writeState()');
-  const writeStateBody = output.slice(writeStateIndex, writeStateIndex + 1400);
+  const writeStateBody = output.slice(writeStateIndex, writeStateIndex + 2600);
   assert.ok(
     writeStateBody.includes('date +%H:%M:%S'),
     'el timestamp no puede venir de Date.now()/new Date() (prohibido en el sandbox de Workflow) — debe pedirle al agente que corra date'
