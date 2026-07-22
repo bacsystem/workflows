@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.22 — 2026-07-22
+
+Fixed:
+
+- `src/plan-parser.js`: two diagnostic gaps found by an external review
+  with empirical reproduction (not static reading) — both let a
+  symbol-based dependency vanish from the plan's DAG without a useful
+  warning, so a task that should have been serialized could instead run
+  in parallel with its producer.
+  - A `- Consumes:`/`- Produces:` value with only a single-character
+    symbol between backticks (e.g. `` `x` ``) hit the anti-prose
+    `length > 1` filter and got the generic "no backtick-quoted symbols"
+    warning — false, the line has one. The warning now names the real
+    cause and cites the dropped symbol.
+  - A task missing the `**Interfaces:**` section entirely (typically a
+    header typo like `**Interface:**`) silently produced empty
+    `consumes`/`produces` with no warning at all — the single most
+    destructive parse miss and, until now, the only silent one. The
+    parser now warns and suggests writing `None` explicitly.
+
+  Neither fix changes the graph a well-formed plan produces — both only
+  make the diagnostics tell the truth. `skills/plan/SKILL.md` now also
+  documents that the `**Interfaces:**` header itself must always be
+  present.
+
 ## 0.6.21 — 2026-07-21
 
 Added:

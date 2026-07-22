@@ -62,7 +62,11 @@ Hard rules (the executor's parser depends on them):
 - **One entry per line** in Consumes/Produces — a value wrapping onto a
   second line is silently lost by the parser.
 - `Consumes: None` means an empty list; write it when a task is
-  independent.
+  independent. The `**Interfaces:**` header itself must always be present
+  — omitting it entirely (e.g. a typo like `**Interface:**`) silently
+  drops every symbol-based dependency for that task; the parser warns
+  when the header is missing, but write `None` explicitly rather than
+  relying on that warning.
 - Two tasks touching the same file are automatically serialized by the
   executor; design task boundaries so files are disjoint whenever
   possible — disjoint tasks run in parallel.

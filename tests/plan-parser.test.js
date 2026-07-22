@@ -180,6 +180,42 @@ test('una anotación bold con texto detrás NO termina la sección; un header so
     'la anotación inline no debe cortar la sección (b.js se perdía en silencio)');
 });
 
+test('una tarea sin sección **Interfaces:** genera un warning (hallazgo de revisión externa 2026-07-22: un typo en el header — p. ej. **Interface:** — borraba todas las dependencias por símbolo de la tarea sin un solo aviso, el único caso del parser que callaba)', () => {
+  const text = [
+    '### Task 1: Producer fine',
+    '',
+    '**Interfaces:**',
+    '- Produces: `foo`',
+    '',
+    '- [ ] **Step 1: x**',
+    '',
+    '### Task 2: Section missing entirely',
+    '',
+    '**Files:**',
+    '- Create: `b.js`',
+    '',
+    '- [ ] **Step 1: x**',
+  ].join('\n');
+  const { tasks, warnings } = parsePlanWithDiagnostics(text);
+  assert.deepEqual(tasks[1].interfaces, { consumes: [], produces: [] });
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /Task 2/);
+  assert.match(
+    warnings[0],
+    /no .*Interfaces:.*section/i,
+    'la ausencia total de la sección debe avisar — es el caso más destructivo y era el único silencioso'
+  );
+});
+
+test('el plan de ejemplo hello-parallel no gana warnings nuevos (regresión: es un plan bien formado)', () => {
+  const examplePlan = readFileSync(
+    path.join(here, '../examples/hello-parallel/plan.md'),
+    'utf8'
+  );
+  const { warnings } = parsePlanWithDiagnostics(examplePlan);
+  assert.deepEqual(warnings, []);
+});
+
 test('warns cuando una línea Consumes/Produces con contenido no tiene ningún backtick', () => {
   const text = [
     '### Task 1: A',
@@ -194,6 +230,27 @@ test('warns cuando una línea Consumes/Produces con contenido no tiene ningún b
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /Task 1/);
   assert.match(warnings[0], /no backtick/);
+});
+
+test('un símbolo de 1 carácter se descarta con un warning que dice la causa REAL (hallazgo de revisión externa 2026-07-22: el warning genérico "no backtick-quoted symbols" mentía — la línea sí los tenía)', () => {
+  const text = [
+    '### Task 1: Uses short symbol',
+    '',
+    '**Interfaces:**',
+    '- Consumes: `x`',
+    '',
+    '- [ ] **Step 1: x**',
+  ].join('\n');
+  const { tasks, warnings } = parsePlanWithDiagnostics(text);
+  assert.deepEqual(tasks[0].interfaces.consumes, [], 'el filtro se mantiene: 1 char no es símbolo');
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /Task 1/);
+  assert.match(
+    warnings[0],
+    /single-character/i,
+    'el warning debe nombrar la causa real (símbolo de 1 carácter descartado), no "no backtick-quoted symbols"'
+  );
+  assert.match(warnings[0], /`x`/, 'debe citar el símbolo descartado para que sea encontrable');
 });
 
 test('no warnea por "None" ni por líneas correctamente backtickeadas', () => {
