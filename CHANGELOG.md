@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.21 — 2026-07-21
+
+Added:
+
+- `requestWriteState()`/`appendLedger()` now log how many pending
+  writes/lines got coalesced into a single agent, so batching is visible
+  in the run's own log output instead of only inferable from agent counts.
+- `cys:plan`'s self-review checklist gained two checks caught only by the
+  executor's adversarial reviewer in a real `bs-inventory` pilot
+  (2026-07-20/21), not by writing the plan itself: caller-cardinality
+  (trace every real call site's multiplicity, not just your own task's
+  test case) and spec-field literalness (re-read and grep the spec's
+  exact field mapping instead of writing it from memory).
+
+Fixed:
+
+- `bin/review-package.js`: raised `execFileSync`'s `maxBuffer` to 1GB —
+  the 1MB Node default threw `ENOBUFS`/maxBuffer-exceeded on a real diff
+  package spanning many files (207-file MUI removal in the
+  `bs-inventory` pilot's Task 13).
+- `writeState()`/`deleteState()`/`appendLedger()` now instruct the agent
+  to verify content against real repo state (git log, git merge-base,
+  task reports) before writing, with a "report the discrepancy instead"
+  escape hatch — the previous "frame it as already-verified" wording
+  kept getting flagged as Instruction Poisoning by the safety classifier
+  across two real pilot runs.
+- The state-write agent now self-corrects stale-but-genuine entries
+  (queued-then-overtaken-by-real-progress) instead of only refusing and
+  leaving `state.json` frozen at its first snapshot for the rest of the
+  run; refusal is reserved for entries that look fabricated outright.
+- `requestWriteState()`/`appendLedger()` now coalesce concurrent calls
+  into one agent instead of dispatching one `[state]`/`[ledger]` agent
+  per transition/line — real pilot data showed bookkeeping agents alone
+  accounting for 35 of 77 dispatched agents in one run.
+- `runTask` now fast-exits tasks whose branch is already merged into the
+  integration branch (two read-only git checks, no re-implementation,
+  review, or merge) instead of re-dispatching already-finished work on
+  every resume — one pilot run re-invoked three tasks 3-5 times each,
+  costing 63 review agents and 57 merge agents on a 10-task plan. The
+  fast-exit also requires the branch to carry real commits of its own
+  (not just be a trivial ancestor), so an empty stub branch from a
+  session cut short between branch creation and first commit still
+  implements normally instead of being silently skipped.
+
+Changed:
+
+- Bookkeeping agents (`state`/`ledger`/`state-clear`) now run at
+  `effort: 'low'` instead of inheriting the session's reasoning effort,
+  since real pilot data showed they're a plurality of all dispatched
+  agents doing purely mechanical work (verify git, write JSON, append
+  log lines) — quality-bearing agents (implement/review/fix/merge/
+  final-review) are unaffected.
+
 ## 0.6.20 — 2026-07-19
 
 Added:
