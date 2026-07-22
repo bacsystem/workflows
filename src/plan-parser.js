@@ -40,6 +40,14 @@ function extractSection(body, sectionRe) {
   return match ? match[1] : '';
 }
 
+// A diferencia de extractSection (que aplana "sin match" y "match vacío" a ''), esta
+// devuelve null cuando la sección falta por completo, para que parseInterfaces pueda
+// distinguir "no hay sección" de "la sección está pero vacía".
+function extractOptionalSection(body, sectionRe) {
+  const match = body.match(sectionRe);
+  return match ? match[1] : null;
+}
+
 function parseFiles(body) {
   const section = extractSection(body, FILES_SECTION_RE);
   const files = { create: [], modify: [], test: [] };
@@ -91,7 +99,21 @@ function extractSymbols(line) {
 const NO_SYMBOLS_RE = /^(none|n\/a|nothing)\b/i;
 
 function parseInterfaces(body, taskId, warnings) {
-  const section = extractSection(body, INTERFACES_SECTION_RE);
+  const section = extractOptionalSection(body, INTERFACES_SECTION_RE);
+  if (section === null) {
+    // La sección entera falta — típicamente un typo en el header (**Interface:**,
+    // **Interfaz:**) o una tarea escrita a mano sin ella. Es el caso más destructivo
+    // (borra TODAS las dependencias por símbolo de la tarea) y era el único que no
+    // avisaba: un valor vacío sí warns, una línea sin backticks sí warns. Puede ser
+    // legítimo (tarea sin interfaces) — por eso es warning, no error, igual que el
+    // consumidor huérfano. Hallazgo de revisión externa 2026-07-22.
+    warnings.push(
+      `Task ${taskId}: no **Interfaces:** section found — symbol-based dependencies ` +
+      `for this task cannot be inferred; if the task has none, write ` +
+      `"- Consumes: None" / "- Produces: None" explicitly`
+    );
+    return { consumes: [], produces: [] };
+  }
   const lines = section.split('\n');
   const interfaces = { consumes: [], produces: [] };
   for (let i = 0; i < lines.length; i++) {

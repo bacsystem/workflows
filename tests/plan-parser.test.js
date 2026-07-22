@@ -180,6 +180,42 @@ test('una anotación bold con texto detrás NO termina la sección; un header so
     'la anotación inline no debe cortar la sección (b.js se perdía en silencio)');
 });
 
+test('una tarea sin sección **Interfaces:** genera un warning (hallazgo de revisión externa 2026-07-22: un typo en el header — p. ej. **Interface:** — borraba todas las dependencias por símbolo de la tarea sin un solo aviso, el único caso del parser que callaba)', () => {
+  const text = [
+    '### Task 1: Producer fine',
+    '',
+    '**Interfaces:**',
+    '- Produces: `foo`',
+    '',
+    '- [ ] **Step 1: x**',
+    '',
+    '### Task 2: Section missing entirely',
+    '',
+    '**Files:**',
+    '- Create: `b.js`',
+    '',
+    '- [ ] **Step 1: x**',
+  ].join('\n');
+  const { tasks, warnings } = parsePlanWithDiagnostics(text);
+  assert.deepEqual(tasks[1].interfaces, { consumes: [], produces: [] });
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /Task 2/);
+  assert.match(
+    warnings[0],
+    /no .*Interfaces:.*section/i,
+    'la ausencia total de la sección debe avisar — es el caso más destructivo y era el único silencioso'
+  );
+});
+
+test('el plan de ejemplo hello-parallel no gana warnings nuevos (regresión: es un plan bien formado)', () => {
+  const examplePlan = readFileSync(
+    path.join(here, '../examples/hello-parallel/plan.md'),
+    'utf8'
+  );
+  const { warnings } = parsePlanWithDiagnostics(examplePlan);
+  assert.deepEqual(warnings, []);
+});
+
 test('warns cuando una línea Consumes/Produces con contenido no tiene ningún backtick', () => {
   const text = [
     '### Task 1: A',
