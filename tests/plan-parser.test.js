@@ -196,6 +196,27 @@ test('warns cuando una línea Consumes/Produces con contenido no tiene ningún b
   assert.match(warnings[0], /no backtick/);
 });
 
+test('un símbolo de 1 carácter se descarta con un warning que dice la causa REAL (hallazgo de revisión externa 2026-07-22: el warning genérico "no backtick-quoted symbols" mentía — la línea sí los tenía)', () => {
+  const text = [
+    '### Task 1: Uses short symbol',
+    '',
+    '**Interfaces:**',
+    '- Consumes: `x`',
+    '',
+    '- [ ] **Step 1: x**',
+  ].join('\n');
+  const { tasks, warnings } = parsePlanWithDiagnostics(text);
+  assert.deepEqual(tasks[0].interfaces.consumes, [], 'el filtro se mantiene: 1 char no es símbolo');
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /Task 1/);
+  assert.match(
+    warnings[0],
+    /single-character/i,
+    'el warning debe nombrar la causa real (símbolo de 1 carácter descartado), no "no backtick-quoted symbols"'
+  );
+  assert.match(warnings[0], /`x`/, 'debe citar el símbolo descartado para que sea encontrable');
+});
+
 test('no warnea por "None" ni por líneas correctamente backtickeadas', () => {
   const text = [
     '### Task 1: A',

@@ -67,6 +67,7 @@ const IDENTIFIER_RE = /[A-Za-z_][A-Za-z0-9_.]*/g;
 
 function extractSymbols(line) {
   const symbols = [];
+  const droppedShort = [];
   for (const [, rawSpan] of line.matchAll(BACKTICK_SPAN_RE)) {
     // Drop parenthesized call-argument lists first (e.g. the "name" in
     // `createWidget(name)`) so parameter names aren't mistaken for separate
@@ -80,9 +81,10 @@ function extractSymbols(line) {
     }
     for (const [identifier] of span.matchAll(IDENTIFIER_RE)) {
       if (identifier.length > 1) symbols.push(identifier);
+      else droppedShort.push(identifier);
     }
   }
-  return symbols;
+  return { symbols, droppedShort };
 }
 
 // "None"/"N/A"/"nothing" al comienzo del valor significa deliberadamente vacío.
@@ -116,14 +118,26 @@ function parseInterfaces(body, taskId, warnings) {
       );
       continue;
     }
-    const symbols = extractSymbols(value);
+    const { symbols, droppedShort } = extractSymbols(value);
     if (symbols.length === 0) {
-      // La línea tiene contenido pero ningún backtick: se ignora, pero avisando — una
-      // dependencia perdida en silencio es justo lo que este parser debe evitar.
-      warnings.push(
-        `Task ${taskId}: ${consumes ? 'Consumes' : 'Produces'} line has no backtick-quoted ` +
-        `symbols and was ignored: "${value}"`
-      );
+      const kind = consumes ? 'Consumes' : 'Produces';
+      if (droppedShort.length > 0) {
+        // La causa real: había símbolos entre backticks, pero de 1 carácter — el
+        // filtro anti-prosa (length > 1) los descarta a propósito. Decir "no
+        // backtick-quoted symbols" mandaba a quien nombró su símbolo `x` a buscar
+        // el problema equivocado. Hallazgo de revisión externa 2026-07-22.
+        warnings.push(
+          `Task ${taskId}: ${kind} single-character symbol(s) ` +
+          `${droppedShort.map((s) => `\`${s}\``).join(', ')} were ignored ` +
+          `(too likely to be prose) — rename to 2+ characters if it's a real symbol: "${value}"`
+        );
+      } else {
+        // La línea tiene contenido pero ningún backtick: se ignora, pero avisando — una
+        // dependencia perdida en silencio es justo lo que este parser debe evitar.
+        warnings.push(
+          `Task ${taskId}: ${kind} line has no backtick-quoted symbols and was ignored: "${value}"`
+        );
+      }
       continue;
     }
     (consumes ? interfaces.consumes : interfaces.produces).push(...symbols);
