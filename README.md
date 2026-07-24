@@ -457,7 +457,8 @@ node bin/parse-plan.js /path/to/your-plan.md > /tmp/plan-graph.json
 Claude Code `Workflow` tool already queues excess `agent()` calls beyond its own
 `min(16, cores-2)` cap, so this is mainly useful to go *lower* than that — e.g. to avoid
 many simultaneous local git worktrees on your own machine for a plan with a wide layer of
-independent tasks.
+independent tasks. `/run-plan` and `/cys:flow` offer to set it for you when the parsed
+plan's inferred parallel width exceeds 6 — you don't need to compute this by hand.
 
 ### The `/run-plan` slash command
 
