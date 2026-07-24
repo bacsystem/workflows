@@ -76,10 +76,15 @@ REPO = `${CLAUDE_PLUGIN_ROOT}`
      the branches themselves. Pass their words verbatim as `args.mergeAuthorization`. If
      they decline to give one, proceed without it and mention that some merges may then
      need authorizing individually mid-run.
+   - **Only if `parallelWidth` (from step 4's JSON) is greater than 6**: mention that
+     this plan can run up to that many tasks at once (worktrees + subagents + merges
+     all in parallel), and ask whether to cap it with `maxConcurrency` — a positive
+     integer, or leave unlimited (the default). Don't ask for narrower plans; a low
+     `parallelWidth` never benefits from capping.
 
 6. **Summarize before launching**: plan path, repo, task count, integration branch,
-   openPr/PR settings, and confirm the authorization text with the user. This is a real
-   run against their repo — don't skip the confirmation.
+   openPr/PR settings, `maxConcurrency` if set, and confirm the authorization text with
+   the user. This is a real run against their repo — don't skip the confirmation.
 
 7. **Create the integration branch if it doesn't exist** (skip if `allDone`
    was `true` — the branch already has everything merged on it): run
@@ -107,10 +112,10 @@ REPO = `${CLAUDE_PLUGIN_ROOT}`
 
 9. **Launch**: invoke the `Workflow` tool with:
    - `scriptPath`: `<REPO>/workflows/parallel-plan-executor.js`
-   - `args`: if `allDone` was `true`, `{ tasks: [], graph: {}, planPath, repoPath, integrationBranch, executorPath: <REPO>, finishOnly: true, openPr, pr }` (no `mergeAuthorization` — nothing merges in this mode). Otherwise,
-     `{ tasks, graph, planPath, repoPath, integrationBranch, executorPath: <REPO>, openPr, pr, mergeAuthorization }`
+   - `args`: if `allDone` was `true`, `{ tasks: [], graph: {}, planPath, repoPath, integrationBranch, executorPath: <REPO>, finishOnly: true, openPr, pr }` (no `mergeAuthorization`/`maxConcurrency` — nothing runs in this mode). Otherwise,
+     `{ tasks, graph, planPath, repoPath, integrationBranch, executorPath: <REPO>, openPr, pr, mergeAuthorization, maxConcurrency }`
      (executorPath is REPO — the workflow invokes REPO/bin scripts by exact path;
-     omit `openPr`/`pr`/`mergeAuthorization` if not provided)
+     omit `openPr`/`pr`/`mergeAuthorization`/`maxConcurrency` if not provided)
 
 10. **After launching**: tell the user it's running in the background, mention they can
    ask "how's the workflow going?" any time or open `/workflows`, and that you'll report

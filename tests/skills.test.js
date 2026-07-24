@@ -100,6 +100,21 @@ test('los comandos detectan .cys/state.json de una corrida interrumpida (Fase 4b
   );
 });
 
+test('los comandos ofrecen maxConcurrency cuando el plan es ancho, y lo pasan en el launch (hallazgo: runDag lo soporta desde 0.6.15 pero ningún comando lo preguntaba ni lo pasaba)', () => {
+  const flow = readFileSync(path.join(root, 'commands', 'flow.md'), 'utf8');
+  const runPlan = readFileSync(path.join(root, 'commands', 'run-plan.md'), 'utf8');
+  for (const [name, content] of [['flow.md', flow], ['run-plan.md', runPlan]]) {
+    assert.ok(
+      content.includes('parallelWidth') && content.includes('maxConcurrency'),
+      `commands/${name}: debe leer parallelWidth del JSON parseado y decidir si ofrecer maxConcurrency`
+    );
+    assert.ok(
+      content.includes('mergeAuthorization, maxConcurrency') || content.includes('mergeAuthorization,\n     maxConcurrency'),
+      `commands/${name}: maxConcurrency debe llegar hasta los args del launch, no quedar solo preguntado`
+    );
+  }
+});
+
 test('run-plan.md maneja allDone lanzando con finishOnly en vez de fallar por tasks vacío (final review, hallazgo Important #2)', () => {
   const runPlan = readFileSync(path.join(root, 'commands', 'run-plan.md'), 'utf8');
   assert.ok(

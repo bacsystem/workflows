@@ -75,11 +75,18 @@ REPO = `${CLAUDE_PLUGIN_ROOT}`
      "I authorize merging task-1 through task-N into feature/x"). Never
      fabricate it; a bare "yes" is not enough — they name the branches.
      Pass their words verbatim as `args.mergeAuthorization`.
+   - **Only if `parallelWidth` (from step 6's JSON) is greater than 6**: mention
+     that this plan can run up to that many tasks at once (worktrees +
+     subagents + merges all in parallel), and ask whether to cap it with
+     `maxConcurrency` — a positive integer, or leave unlimited (the
+     default). Don't ask for narrower plans; a low `parallelWidth` never
+     benefits from capping.
 
 8. **Summarize and confirm**: plan path, repo, task count, parallelism
-   the graph shows, integration branch, PR settings, authorization text.
-   Re-check the working tree is still clean; if the integration branch
-   already exists, ask whether to continue on it or pick another name.
+   the graph shows, integration branch, PR settings, `maxConcurrency` if
+   set, authorization text. Re-check the working tree is still clean; if
+   the integration branch already exists, ask whether to continue on it
+   or pick another name.
 
 9. **Create the integration branch if it doesn't exist**: run
    `git -C <repo-path> show-ref --verify --quiet
@@ -107,8 +114,8 @@ REPO = `${CLAUDE_PLUGIN_ROOT}`
 11. **Launch** the `Workflow` tool with:
    - `scriptPath`: `REPO/workflows/parallel-plan-executor.js`
    - `args`: `{ tasks, graph, planPath, repoPath, integrationBranch,
-     executorPath: REPO, openPr, pr, mergeAuthorization }` (omit the
-     optional ones not provided).
+     executorPath: REPO, openPr, pr, mergeAuthorization, maxConcurrency }`
+     (omit the optional ones not provided).
 
 12. **After launching**: tell the user it runs in the background, that
    they can ask "how's the workflow going?" or open `/workflows`, and
