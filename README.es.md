@@ -491,7 +491,9 @@ node bin/parse-plan.js /ruta/a/tu-plan.md > /tmp/plan-graph.json
 DAG. La tool `Workflow` de Claude Code ya encola las llamadas a `agent()` que exceden su
 propio tope de `min(16, cores-2)`, así que esto sirve sobre todo para ir *más abajo* de
 ese default — por ejemplo, para evitar muchos worktrees locales simultáneos en tu propia
-máquina cuando un plan tiene una capa ancha de tareas independientes.
+máquina cuando un plan tiene una capa ancha de tareas independientes. `/run-plan` y
+`/cys:flow` te ofrecen configurarlo automáticamente cuando el ancho de paralelismo
+inferido del plan supera 6 — no hace falta calcularlo a mano.
 
 ### El comando `/run-plan`
 

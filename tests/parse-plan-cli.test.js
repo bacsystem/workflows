@@ -31,6 +31,15 @@ test('CLI exits non-zero with a usage message when no path is given', () => {
   assert.throws(() => execFileSync('node', [cliPath], { encoding: 'utf8' }));
 });
 
+test('el JSON incluye parallelWidth, para que los comandos decidan si vale la pena ofrecer maxConcurrency', () => {
+  const output = execFileSync('node', [cliPath, fixturePath], { encoding: 'utf8' });
+  const parsed = JSON.parse(output);
+
+  // fixtures/sample-plan.md: tasks 1 y 2 son independientes (capa 0, ancho 2), la tarea
+  // 3 depende de ambas (capa 1, ancho 1) — el ancho máximo del plan es 2.
+  assert.equal(parsed.parallelWidth, 2);
+});
+
 test('el comando publicado en examples/README.md imprime el grafo que ese README promete', () => {
   // examples/README.md muestra `node bin/parse-plan.js examples/hello-parallel/plan.md`
   // como el primer contacto de un dev nuevo con cys — si el CLI cambia de forma

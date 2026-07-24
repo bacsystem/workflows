@@ -185,6 +185,22 @@ test('allDone es false mientras quede algo pendiente o fallido', () => {
   assert.equal(result.allDone, false);
 });
 
+test('el JSON incluye parallelWidth del grafo remanente, para que los comandos decidan si vale la pena ofrecer maxConcurrency al resumir', () => {
+  const { dir, planPath } = makeFixtures();
+  const statePath = writeState(dir, planPath, {
+    1: { status: 'done' },
+    2: { status: 'failed' },
+    3: { status: 'pending' },
+  });
+
+  const stdout = execFileSync('node', [cli, planPath, statePath], { encoding: 'utf8' });
+  const result = JSON.parse(stdout);
+
+  // Remanente: { 2: [], 3: [2] } — 2 no tiene dependencias pendientes, 3 depende de 2:
+  // ancho máximo 1 (nunca corren al mismo tiempo).
+  assert.equal(result.parallelWidth, 1);
+});
+
 test('falla ruidosamente sin args', () => {
   assert.throws(() => execFileSync('node', [cli], { encoding: 'utf8', stdio: 'pipe' }));
 });

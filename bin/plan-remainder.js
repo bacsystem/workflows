@@ -2,7 +2,7 @@
 import { readFileSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parsePlanWithDiagnostics } from '../src/plan-parser.js';
-import { buildGraphWithDiagnostics } from '../src/graph-builder.js';
+import { buildGraphWithDiagnostics, computeParallelWidth } from '../src/graph-builder.js';
 
 const [, , planPath, stateJsonPath] = process.argv;
 if (!planPath || !stateJsonPath) {
@@ -63,4 +63,8 @@ const warnings = [...parseWarnings, ...graphWarnings];
 for (const warning of warnings) {
   console.error(`WARNING: ${warning}`);
 }
-console.log(JSON.stringify({ tasks: remainingTasks, graph: remainingGraph, warnings, allDone }, null, 2));
+console.log(JSON.stringify(
+  { tasks: remainingTasks, graph: remainingGraph, warnings, allDone, parallelWidth: computeParallelWidth(remainingGraph) },
+  null,
+  2
+));

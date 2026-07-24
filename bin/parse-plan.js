@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
 import { parsePlanWithDiagnostics } from '../src/plan-parser.js';
-import { buildGraphWithDiagnostics } from '../src/graph-builder.js';
+import { buildGraphWithDiagnostics, computeParallelWidth } from '../src/graph-builder.js';
 
 const [, , planPath] = process.argv;
 if (!planPath) {
@@ -19,4 +19,4 @@ for (const warning of warnings) {
   console.error(`WARNING: ${warning}`);
 }
 
-console.log(JSON.stringify({ tasks, graph, warnings }, null, 2));
+console.log(JSON.stringify({ tasks, graph, warnings, parallelWidth: computeParallelWidth(graph) }, null, 2));

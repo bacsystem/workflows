@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.24 — 2026-07-24
+
+Added:
+
+- `bin/parse-plan.js` and `bin/plan-remainder.js` now report
+  `parallelWidth` (via the existing `computeParallelWidth`, 0.6.18) in
+  their JSON output.
+- `/cys:run-plan` and `/cys:flow` now offer to set `maxConcurrency`
+  automatically when the parsed plan's `parallelWidth` exceeds 6,
+  explaining that the plan can run that many tasks at once (worktrees +
+  subagents + merges in parallel). Narrower plans are never asked. The
+  chosen value flows through to the `Workflow` launch args in both
+  commands.
+
+  `runDag`'s `maxConcurrency` cap has existed since 0.6.15, but neither
+  command ever asked about it or passed it through — using it required
+  bypassing the command and invoking the `Workflow` tool by hand. Both
+  READMEs updated.
+
 ## 0.6.23 — 2026-07-22
 
 Fixed:
